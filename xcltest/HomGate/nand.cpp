@@ -184,7 +184,7 @@ int main(int argc, char* argv[]) {
 		OCL_CHECK(err, err = q.enqueueMigrateMemObjects(inputs, 0 /* 0 means from host*/));
 		q.finish();
 
-		for(int test = 0; test < 2; test++){
+		for(int test = 0; test < 10; test++){
 			std::chrono::duration<double> kernel_time(0);
 
 			OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_ina,buffer_inb}, 0 /* 0 means from host*/));
