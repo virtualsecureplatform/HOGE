@@ -1,0 +1,147 @@
+// This is a generated file. Use and modify at your own risk.
+//////////////////////////////////////////////////////////////////////////////// 
+// default_nettype of none prevents implicit wire declaration.
+`default_nettype none
+`timescale 1 ns / 1 ps
+// Top level of the kernel. Do not modify module name, parameters or ports.
+module BRFront #(
+  parameter integer C_AXIS00_TDATA_WIDTH = 512,
+  parameter integer C_AXIS01_TDATA_WIDTH = 512,
+  parameter integer C_AXIS02_TDATA_WIDTH = 512,
+  parameter integer C_AXIS03_TDATA_WIDTH = 512,
+  parameter integer C_AXIS04_TDATA_WIDTH = 512,
+  parameter integer C_AXIS05_TDATA_WIDTH = 512,
+  parameter integer C_AXIS06_TDATA_WIDTH = 512,
+  parameter integer C_AXIS07_TDATA_WIDTH = 512
+)
+(
+  // System Signals
+  input  wire                              ap_clk       ,
+  input  wire                              ap_rst_n     ,
+  //  Note: A minimum subset of AXI4 memory mapped signals are declared.  AXI
+  // signals omitted from these interfaces are automatically inferred with the
+  // optimal values for Xilinx accleration platforms.  This allows Xilinx AXI4 Interconnects
+  // within the system to be optimized by removing logic for AXI4 protocol
+  // features that are not necessary. When adapting AXI4 masters within the RTL
+  // kernel that have signals not declared below, it is suitable to add the
+  // signals to the declarations below to connect them to the AXI4 Master.
+  // 
+  // List of ommited signals - effect
+  // -------------------------------
+  // ID - Transaction ID are used for multithreading and out of order
+  // transactions.  This increases complexity. This saves logic and increases Fmax
+  // in the system when ommited.
+  // SIZE - Default value is log2(data width in bytes). Needed for subsize bursts.
+  // This saves logic and increases Fmax in the system when ommited.
+  // BURST - Default value (0b01) is incremental.  Wrap and fixed bursts are not
+  // recommended. This saves logic and increases Fmax in the system when ommited.
+  // LOCK - Not supported in AXI4
+  // CACHE - Default value (0b0011) allows modifiable transactions. No benefit to
+  // changing this.
+  // PROT - Has no effect in current acceleration platforms.
+  // QOS - Has no effect in current acceleration platforms.
+  // REGION - Has no effect in current acceleration platforms.
+  // USER - Has no effect in current acceleration platforms.
+  // RESP - Not useful in most acceleration platforms.
+  // 
+  // AXI4-Stream (slave) interface axis00
+  input  wire                              axis00_tvalid,
+  output wire                              axis00_tready,
+  input  wire [C_AXIS00_TDATA_WIDTH-1:0]   axis00_tdata ,
+  input  wire [C_AXIS00_TDATA_WIDTH/8-1:0] axis00_tkeep ,
+  input  wire                              axis00_tlast ,
+  // AXI4-Stream (master) interface axis01
+  output wire                              axis01_tvalid,
+  input  wire                              axis01_tready,
+  output wire [C_AXIS01_TDATA_WIDTH-1:0]   axis01_tdata ,
+  output wire [C_AXIS01_TDATA_WIDTH/8-1:0] axis01_tkeep ,
+  output wire                              axis01_tlast ,
+  // AXI4-Stream (master) interface axis02
+  output wire                              axis02_tvalid,
+  input  wire                              axis02_tready,
+  output wire [C_AXIS02_TDATA_WIDTH-1:0]   axis02_tdata ,
+  output wire [C_AXIS02_TDATA_WIDTH/8-1:0] axis02_tkeep ,
+  output wire                              axis02_tlast ,
+  // AXI4-Stream (master) interface axis03
+  output wire                              axis03_tvalid,
+  input  wire                              axis03_tready,
+  output wire [C_AXIS03_TDATA_WIDTH-1:0]   axis03_tdata ,
+  output wire [C_AXIS03_TDATA_WIDTH/8-1:0] axis03_tkeep ,
+  output wire                              axis03_tlast ,
+  // AXI4-Stream (master) interface axis04
+  output wire                              axis04_tvalid,
+  input  wire                              axis04_tready,
+  output wire [C_AXIS04_TDATA_WIDTH-1:0]   axis04_tdata ,
+  output wire [C_AXIS04_TDATA_WIDTH/8-1:0] axis04_tkeep ,
+  output wire                              axis04_tlast ,
+  // AXI4-Stream (master) interface axis05
+  output wire                              axis05_tvalid,
+  input  wire                              axis05_tready,
+  output wire [C_AXIS05_TDATA_WIDTH-1:0]   axis05_tdata ,
+  output wire [C_AXIS05_TDATA_WIDTH/8-1:0] axis05_tkeep ,
+  output wire                              axis05_tlast ,
+  // AXI4-Stream (slave) interface axis06
+  input  wire                              axis06_tvalid,
+  output wire                              axis06_tready,
+  input  wire [C_AXIS06_TDATA_WIDTH-1:0]   axis06_tdata ,
+  input  wire [C_AXIS06_TDATA_WIDTH/8-1:0] axis06_tkeep ,
+  input  wire                              axis06_tlast ,
+  // AXI4-Stream (slave) interface axis07
+  input  wire                              axis07_tvalid,
+  output wire                              axis07_tready,
+  input  wire [C_AXIS07_TDATA_WIDTH-1:0]   axis07_tdata ,
+  input  wire [C_AXIS07_TDATA_WIDTH/8-1:0] axis07_tkeep ,
+  input  wire                              axis07_tlast 
+);
+
+///////////////////////////////////////////////////////////////////////////////
+// Local Parameters
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+// Wires and Variables
+///////////////////////////////////////////////////////////////////////////////
+(* DONT_TOUCH = "yes" *)
+reg                                 areset                         = 1'b0;
+
+// Register and invert reset signal.
+always @(posedge ap_clk) begin
+  areset <= ~ap_rst_n;
+end
+
+///////////////////////////////////////////////////////////////////////////////
+// Begin control interface RTL.  Modifying not recommended.
+///////////////////////////////////////////////////////////////////////////////
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Add kernel logic here.  Modify/remove example code as necessary.
+///////////////////////////////////////////////////////////////////////////////
+
+assign axis03_tvalid = axis02_tvalid;
+assign axis04_tvalid = axis02_tvalid;
+assign axis05_tvalid = axis02_tvalid;
+assign axis06_tready = 1'b1;
+assign axis07_tready = 1'b1;
+
+AXISBRFormer axisbrformer(
+  .clock(ap_clk),
+  .reset(areset),
+  .io_axi4sglobalin_TVALID(axis00_tvalid),
+  .io_axi4sglobalin_TREADY(axis00_tready),
+  .io_axi4sglobalin_TDATA(axis00_tdata),
+  .io_axi4sglobalout_TVALID(axis01_tvalid),
+  .io_axi4sglobalout_TREADY(axis01_tready),
+  .io_axi4sglobalout_TDATA(axis01_tdata),
+  .io_axi4sin_0_TVALID(axis06_tvalid),
+  .io_axi4sin_0_TDATA(axis06_tdata),
+  .io_axi4sin_1_TDATA(axis07_tdata),
+  .io_axi4sout_0_TVALID(axis02_tvalid),
+  .io_axi4sout_0_TDATA(axis02_tdata),
+  .io_axi4sout_1_TDATA(axis03_tdata),
+  .io_axi4sout_2_TDATA(axis04_tdata),
+  .io_axi4sout_3_TDATA(axis05_tdata)
+);
+
+endmodule
+`default_nettype wire

@@ -1,0 +1,3 @@
+[submodule "thirdparties/TFHEpp"]
+	path = thirdparties/TFHEpp
+	url = https://github.com/virtualsecureplatform/TFHEpp.git

@@ -1,0 +1,798 @@
+// This is a generated file. Use and modify at your own risk.
+//////////////////////////////////////////////////////////////////////////////// 
+// default_nettype of none prevents implicit wire declaration.
+`default_nettype none
+`timescale 1 ns / 1 ps
+// Top level of the kernel. Do not modify module name, parameters or ports.
+module AXISIKS_Top #(
+  parameter integer C_S_AXI_CONTROL_ADDR_WIDTH = 12 ,
+  parameter integer C_S_AXI_CONTROL_DATA_WIDTH = 32 ,
+  parameter integer C_M00_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M00_AXI_DATA_WIDTH       = 512,
+  parameter integer C_M01_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M01_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M02_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M02_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M03_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M03_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M04_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M04_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M05_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M05_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M06_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M06_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M07_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M07_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M08_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M08_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M09_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M09_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M10_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M10_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M11_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M11_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M12_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M12_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M13_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M13_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M14_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M14_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M15_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M15_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M16_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M16_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M17_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M17_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M18_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M18_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M19_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M19_AXI_DATA_WIDTH       = 256,
+  parameter integer C_M20_AXI_ADDR_WIDTH       = 64 ,
+  parameter integer C_M20_AXI_DATA_WIDTH       = 256
+)
+(
+  // System Signals
+  input  wire                                    ap_clk               ,
+  input  wire                                    ap_rst_n             ,
+  //  Note: A minimum subset of AXI4 memory mapped signals are declared.  AXI
+  // signals omitted from these interfaces are automatically inferred with the
+  // optimal values for Xilinx accleration platforms.  This allows Xilinx AXI4 Interconnects
+  // within the system to be optimized by removing logic for AXI4 protocol
+  // features that are not necessary. When adapting AXI4 masters within the RTL
+  // kernel that have signals not declared below, it is suitable to add the
+  // signals to the declarations below to connect them to the AXI4 Master.
+  // 
+  // List of ommited signals - effect
+  // -------------------------------
+  // ID - Transaction ID are used for multithreading and out of order
+  // transactions.  This increases complexity. This saves logic and increases Fmax
+  // in the system when ommited.
+  // SIZE - Default value is log2(data width in bytes). Needed for subsize bursts.
+  // This saves logic and increases Fmax in the system when ommited.
+  // BURST - Default value (0b01) is incremental.  Wrap and fixed bursts are not
+  // recommended. This saves logic and increases Fmax in the system when ommited.
+  // LOCK - Not supported in AXI4
+  // CACHE - Default value (0b0011) allows modifiable transactions. No benefit to
+  // changing this.
+  // PROT - Has no effect in current acceleration platforms.
+  // QOS - Has no effect in current acceleration platforms.
+  // REGION - Has no effect in current acceleration platforms.
+  // USER - Has no effect in current acceleration platforms.
+  // RESP - Not useful in most acceleration platforms.
+  // 
+  // AXI4 master interface m00_axi
+  output wire                                    m00_axi_awvalid      ,
+  input  wire                                    m00_axi_awready      ,
+  output wire [C_M00_AXI_ADDR_WIDTH-1:0]         m00_axi_awaddr       ,
+  output wire [8-1:0]                            m00_axi_awlen        ,
+  output wire                                    m00_axi_wvalid       ,
+  input  wire                                    m00_axi_wready       ,
+  output wire [C_M00_AXI_DATA_WIDTH-1:0]         m00_axi_wdata        ,
+  output wire [C_M00_AXI_DATA_WIDTH/8-1:0]       m00_axi_wstrb        ,
+  output wire                                    m00_axi_wlast        ,
+  input  wire                                    m00_axi_bvalid       ,
+  output wire                                    m00_axi_bready       ,
+  output wire                                    m00_axi_arvalid      ,
+  input  wire                                    m00_axi_arready      ,
+  output wire [C_M00_AXI_ADDR_WIDTH-1:0]         m00_axi_araddr       ,
+  output wire [8-1:0]                            m00_axi_arlen        ,
+  input  wire                                    m00_axi_rvalid       ,
+  output wire                                    m00_axi_rready       ,
+  input  wire [C_M00_AXI_DATA_WIDTH-1:0]         m00_axi_rdata        ,
+  input  wire                                    m00_axi_rlast        ,
+  // AXI4 master interface m01_axi
+  output wire                                    m01_axi_awvalid      ,
+  input  wire                                    m01_axi_awready      ,
+  output wire [C_M01_AXI_ADDR_WIDTH-1:0]         m01_axi_awaddr       ,
+  output wire [8-1:0]                            m01_axi_awlen        ,
+  output wire                                    m01_axi_wvalid       ,
+  input  wire                                    m01_axi_wready       ,
+  output wire [C_M01_AXI_DATA_WIDTH-1:0]         m01_axi_wdata        ,
+  output wire [C_M01_AXI_DATA_WIDTH/8-1:0]       m01_axi_wstrb        ,
+  output wire                                    m01_axi_wlast        ,
+  input  wire                                    m01_axi_bvalid       ,
+  output wire                                    m01_axi_bready       ,
+  output wire                                    m01_axi_arvalid      ,
+  input  wire                                    m01_axi_arready      ,
+  output wire [C_M01_AXI_ADDR_WIDTH-1:0]         m01_axi_araddr       ,
+  output wire [8-1:0]                            m01_axi_arlen        ,
+  input  wire                                    m01_axi_rvalid       ,
+  output wire                                    m01_axi_rready       ,
+  input  wire [C_M01_AXI_DATA_WIDTH-1:0]         m01_axi_rdata        ,
+  input  wire                                    m01_axi_rlast        ,
+  // AXI4 master interface m02_axi
+  output wire                                    m02_axi_awvalid      ,
+  input  wire                                    m02_axi_awready      ,
+  output wire [C_M02_AXI_ADDR_WIDTH-1:0]         m02_axi_awaddr       ,
+  output wire [8-1:0]                            m02_axi_awlen        ,
+  output wire                                    m02_axi_wvalid       ,
+  input  wire                                    m02_axi_wready       ,
+  output wire [C_M02_AXI_DATA_WIDTH-1:0]         m02_axi_wdata        ,
+  output wire [C_M02_AXI_DATA_WIDTH/8-1:0]       m02_axi_wstrb        ,
+  output wire                                    m02_axi_wlast        ,
+  input  wire                                    m02_axi_bvalid       ,
+  output wire                                    m02_axi_bready       ,
+  output wire                                    m02_axi_arvalid      ,
+  input  wire                                    m02_axi_arready      ,
+  output wire [C_M02_AXI_ADDR_WIDTH-1:0]         m02_axi_araddr       ,
+  output wire [8-1:0]                            m02_axi_arlen        ,
+  input  wire                                    m02_axi_rvalid       ,
+  output wire                                    m02_axi_rready       ,
+  input  wire [C_M02_AXI_DATA_WIDTH-1:0]         m02_axi_rdata        ,
+  input  wire                                    m02_axi_rlast        ,
+  // AXI4 master interface m03_axi
+  output wire                                    m03_axi_awvalid      ,
+  input  wire                                    m03_axi_awready      ,
+  output wire [C_M03_AXI_ADDR_WIDTH-1:0]         m03_axi_awaddr       ,
+  output wire [8-1:0]                            m03_axi_awlen        ,
+  output wire                                    m03_axi_wvalid       ,
+  input  wire                                    m03_axi_wready       ,
+  output wire [C_M03_AXI_DATA_WIDTH-1:0]         m03_axi_wdata        ,
+  output wire [C_M03_AXI_DATA_WIDTH/8-1:0]       m03_axi_wstrb        ,
+  output wire                                    m03_axi_wlast        ,
+  input  wire                                    m03_axi_bvalid       ,
+  output wire                                    m03_axi_bready       ,
+  output wire                                    m03_axi_arvalid      ,
+  input  wire                                    m03_axi_arready      ,
+  output wire [C_M03_AXI_ADDR_WIDTH-1:0]         m03_axi_araddr       ,
+  output wire [8-1:0]                            m03_axi_arlen        ,
+  input  wire                                    m03_axi_rvalid       ,
+  output wire                                    m03_axi_rready       ,
+  input  wire [C_M03_AXI_DATA_WIDTH-1:0]         m03_axi_rdata        ,
+  input  wire                                    m03_axi_rlast        ,
+  // AXI4 master interface m04_axi
+  output wire                                    m04_axi_awvalid      ,
+  input  wire                                    m04_axi_awready      ,
+  output wire [C_M04_AXI_ADDR_WIDTH-1:0]         m04_axi_awaddr       ,
+  output wire [8-1:0]                            m04_axi_awlen        ,
+  output wire                                    m04_axi_wvalid       ,
+  input  wire                                    m04_axi_wready       ,
+  output wire [C_M04_AXI_DATA_WIDTH-1:0]         m04_axi_wdata        ,
+  output wire [C_M04_AXI_DATA_WIDTH/8-1:0]       m04_axi_wstrb        ,
+  output wire                                    m04_axi_wlast        ,
+  input  wire                                    m04_axi_bvalid       ,
+  output wire                                    m04_axi_bready       ,
+  output wire                                    m04_axi_arvalid      ,
+  input  wire                                    m04_axi_arready      ,
+  output wire [C_M04_AXI_ADDR_WIDTH-1:0]         m04_axi_araddr       ,
+  output wire [8-1:0]                            m04_axi_arlen        ,
+  input  wire                                    m04_axi_rvalid       ,
+  output wire                                    m04_axi_rready       ,
+  input  wire [C_M04_AXI_DATA_WIDTH-1:0]         m04_axi_rdata        ,
+  input  wire                                    m04_axi_rlast        ,
+  // AXI4 master interface m05_axi
+  output wire                                    m05_axi_awvalid      ,
+  input  wire                                    m05_axi_awready      ,
+  output wire [C_M05_AXI_ADDR_WIDTH-1:0]         m05_axi_awaddr       ,
+  output wire [8-1:0]                            m05_axi_awlen        ,
+  output wire                                    m05_axi_wvalid       ,
+  input  wire                                    m05_axi_wready       ,
+  output wire [C_M05_AXI_DATA_WIDTH-1:0]         m05_axi_wdata        ,
+  output wire [C_M05_AXI_DATA_WIDTH/8-1:0]       m05_axi_wstrb        ,
+  output wire                                    m05_axi_wlast        ,
+  input  wire                                    m05_axi_bvalid       ,
+  output wire                                    m05_axi_bready       ,
+  output wire                                    m05_axi_arvalid      ,
+  input  wire                                    m05_axi_arready      ,
+  output wire [C_M05_AXI_ADDR_WIDTH-1:0]         m05_axi_araddr       ,
+  output wire [8-1:0]                            m05_axi_arlen        ,
+  input  wire                                    m05_axi_rvalid       ,
+  output wire                                    m05_axi_rready       ,
+  input  wire [C_M05_AXI_DATA_WIDTH-1:0]         m05_axi_rdata        ,
+  input  wire                                    m05_axi_rlast        ,
+  // AXI4 master interface m06_axi
+  output wire                                    m06_axi_awvalid      ,
+  input  wire                                    m06_axi_awready      ,
+  output wire [C_M06_AXI_ADDR_WIDTH-1:0]         m06_axi_awaddr       ,
+  output wire [8-1:0]                            m06_axi_awlen        ,
+  output wire                                    m06_axi_wvalid       ,
+  input  wire                                    m06_axi_wready       ,
+  output wire [C_M06_AXI_DATA_WIDTH-1:0]         m06_axi_wdata        ,
+  output wire [C_M06_AXI_DATA_WIDTH/8-1:0]       m06_axi_wstrb        ,
+  output wire                                    m06_axi_wlast        ,
+  input  wire                                    m06_axi_bvalid       ,
+  output wire                                    m06_axi_bready       ,
+  output wire                                    m06_axi_arvalid      ,
+  input  wire                                    m06_axi_arready      ,
+  output wire [C_M06_AXI_ADDR_WIDTH-1:0]         m06_axi_araddr       ,
+  output wire [8-1:0]                            m06_axi_arlen        ,
+  input  wire                                    m06_axi_rvalid       ,
+  output wire                                    m06_axi_rready       ,
+  input  wire [C_M06_AXI_DATA_WIDTH-1:0]         m06_axi_rdata        ,
+  input  wire                                    m06_axi_rlast        ,
+  // AXI4 master interface m07_axi
+  output wire                                    m07_axi_awvalid      ,
+  input  wire                                    m07_axi_awready      ,
+  output wire [C_M07_AXI_ADDR_WIDTH-1:0]         m07_axi_awaddr       ,
+  output wire [8-1:0]                            m07_axi_awlen        ,
+  output wire                                    m07_axi_wvalid       ,
+  input  wire                                    m07_axi_wready       ,
+  output wire [C_M07_AXI_DATA_WIDTH-1:0]         m07_axi_wdata        ,
+  output wire [C_M07_AXI_DATA_WIDTH/8-1:0]       m07_axi_wstrb        ,
+  output wire                                    m07_axi_wlast        ,
+  input  wire                                    m07_axi_bvalid       ,
+  output wire                                    m07_axi_bready       ,
+  output wire                                    m07_axi_arvalid      ,
+  input  wire                                    m07_axi_arready      ,
+  output wire [C_M07_AXI_ADDR_WIDTH-1:0]         m07_axi_araddr       ,
+  output wire [8-1:0]                            m07_axi_arlen        ,
+  input  wire                                    m07_axi_rvalid       ,
+  output wire                                    m07_axi_rready       ,
+  input  wire [C_M07_AXI_DATA_WIDTH-1:0]         m07_axi_rdata        ,
+  input  wire                                    m07_axi_rlast        ,
+  // AXI4 master interface m08_axi
+  output wire                                    m08_axi_awvalid      ,
+  input  wire                                    m08_axi_awready      ,
+  output wire [C_M08_AXI_ADDR_WIDTH-1:0]         m08_axi_awaddr       ,
+  output wire [8-1:0]                            m08_axi_awlen        ,
+  output wire                                    m08_axi_wvalid       ,
+  input  wire                                    m08_axi_wready       ,
+  output wire [C_M08_AXI_DATA_WIDTH-1:0]         m08_axi_wdata        ,
+  output wire [C_M08_AXI_DATA_WIDTH/8-1:0]       m08_axi_wstrb        ,
+  output wire                                    m08_axi_wlast        ,
+  input  wire                                    m08_axi_bvalid       ,
+  output wire                                    m08_axi_bready       ,
+  output wire                                    m08_axi_arvalid      ,
+  input  wire                                    m08_axi_arready      ,
+  output wire [C_M08_AXI_ADDR_WIDTH-1:0]         m08_axi_araddr       ,
+  output wire [8-1:0]                            m08_axi_arlen        ,
+  input  wire                                    m08_axi_rvalid       ,
+  output wire                                    m08_axi_rready       ,
+  input  wire [C_M08_AXI_DATA_WIDTH-1:0]         m08_axi_rdata        ,
+  input  wire                                    m08_axi_rlast        ,
+  // AXI4 master interface m09_axi
+  output wire                                    m09_axi_awvalid      ,
+  input  wire                                    m09_axi_awready      ,
+  output wire [C_M09_AXI_ADDR_WIDTH-1:0]         m09_axi_awaddr       ,
+  output wire [8-1:0]                            m09_axi_awlen        ,
+  output wire                                    m09_axi_wvalid       ,
+  input  wire                                    m09_axi_wready       ,
+  output wire [C_M09_AXI_DATA_WIDTH-1:0]         m09_axi_wdata        ,
+  output wire [C_M09_AXI_DATA_WIDTH/8-1:0]       m09_axi_wstrb        ,
+  output wire                                    m09_axi_wlast        ,
+  input  wire                                    m09_axi_bvalid       ,
+  output wire                                    m09_axi_bready       ,
+  output wire                                    m09_axi_arvalid      ,
+  input  wire                                    m09_axi_arready      ,
+  output wire [C_M09_AXI_ADDR_WIDTH-1:0]         m09_axi_araddr       ,
+  output wire [8-1:0]                            m09_axi_arlen        ,
+  input  wire                                    m09_axi_rvalid       ,
+  output wire                                    m09_axi_rready       ,
+  input  wire [C_M09_AXI_DATA_WIDTH-1:0]         m09_axi_rdata        ,
+  input  wire                                    m09_axi_rlast        ,
+  // AXI4 master interface m10_axi
+  output wire                                    m10_axi_awvalid      ,
+  input  wire                                    m10_axi_awready      ,
+  output wire [C_M10_AXI_ADDR_WIDTH-1:0]         m10_axi_awaddr       ,
+  output wire [8-1:0]                            m10_axi_awlen        ,
+  output wire                                    m10_axi_wvalid       ,
+  input  wire                                    m10_axi_wready       ,
+  output wire [C_M10_AXI_DATA_WIDTH-1:0]         m10_axi_wdata        ,
+  output wire [C_M10_AXI_DATA_WIDTH/8-1:0]       m10_axi_wstrb        ,
+  output wire                                    m10_axi_wlast        ,
+  input  wire                                    m10_axi_bvalid       ,
+  output wire                                    m10_axi_bready       ,
+  output wire                                    m10_axi_arvalid      ,
+  input  wire                                    m10_axi_arready      ,
+  output wire [C_M10_AXI_ADDR_WIDTH-1:0]         m10_axi_araddr       ,
+  output wire [8-1:0]                            m10_axi_arlen        ,
+  input  wire                                    m10_axi_rvalid       ,
+  output wire                                    m10_axi_rready       ,
+  input  wire [C_M10_AXI_DATA_WIDTH-1:0]         m10_axi_rdata        ,
+  input  wire                                    m10_axi_rlast        ,
+  // AXI4 master interface m11_axi
+  output wire                                    m11_axi_awvalid      ,
+  input  wire                                    m11_axi_awready      ,
+  output wire [C_M11_AXI_ADDR_WIDTH-1:0]         m11_axi_awaddr       ,
+  output wire [8-1:0]                            m11_axi_awlen        ,
+  output wire                                    m11_axi_wvalid       ,
+  input  wire                                    m11_axi_wready       ,
+  output wire [C_M11_AXI_DATA_WIDTH-1:0]         m11_axi_wdata        ,
+  output wire [C_M11_AXI_DATA_WIDTH/8-1:0]       m11_axi_wstrb        ,
+  output wire                                    m11_axi_wlast        ,
+  input  wire                                    m11_axi_bvalid       ,
+  output wire                                    m11_axi_bready       ,
+  output wire                                    m11_axi_arvalid      ,
+  input  wire                                    m11_axi_arready      ,
+  output wire [C_M11_AXI_ADDR_WIDTH-1:0]         m11_axi_araddr       ,
+  output wire [8-1:0]                            m11_axi_arlen        ,
+  input  wire                                    m11_axi_rvalid       ,
+  output wire                                    m11_axi_rready       ,
+  input  wire [C_M11_AXI_DATA_WIDTH-1:0]         m11_axi_rdata        ,
+  input  wire                                    m11_axi_rlast        ,
+  // AXI4 master interface m12_axi
+  output wire                                    m12_axi_awvalid      ,
+  input  wire                                    m12_axi_awready      ,
+  output wire [C_M12_AXI_ADDR_WIDTH-1:0]         m12_axi_awaddr       ,
+  output wire [8-1:0]                            m12_axi_awlen        ,
+  output wire                                    m12_axi_wvalid       ,
+  input  wire                                    m12_axi_wready       ,
+  output wire [C_M12_AXI_DATA_WIDTH-1:0]         m12_axi_wdata        ,
+  output wire [C_M12_AXI_DATA_WIDTH/8-1:0]       m12_axi_wstrb        ,
+  output wire                                    m12_axi_wlast        ,
+  input  wire                                    m12_axi_bvalid       ,
+  output wire                                    m12_axi_bready       ,
+  output wire                                    m12_axi_arvalid      ,
+  input  wire                                    m12_axi_arready      ,
+  output wire [C_M12_AXI_ADDR_WIDTH-1:0]         m12_axi_araddr       ,
+  output wire [8-1:0]                            m12_axi_arlen        ,
+  input  wire                                    m12_axi_rvalid       ,
+  output wire                                    m12_axi_rready       ,
+  input  wire [C_M12_AXI_DATA_WIDTH-1:0]         m12_axi_rdata        ,
+  input  wire                                    m12_axi_rlast        ,
+  // AXI4 master interface m13_axi
+  output wire                                    m13_axi_awvalid      ,
+  input  wire                                    m13_axi_awready      ,
+  output wire [C_M13_AXI_ADDR_WIDTH-1:0]         m13_axi_awaddr       ,
+  output wire [8-1:0]                            m13_axi_awlen        ,
+  output wire                                    m13_axi_wvalid       ,
+  input  wire                                    m13_axi_wready       ,
+  output wire [C_M13_AXI_DATA_WIDTH-1:0]         m13_axi_wdata        ,
+  output wire [C_M13_AXI_DATA_WIDTH/8-1:0]       m13_axi_wstrb        ,
+  output wire                                    m13_axi_wlast        ,
+  input  wire                                    m13_axi_bvalid       ,
+  output wire                                    m13_axi_bready       ,
+  output wire                                    m13_axi_arvalid      ,
+  input  wire                                    m13_axi_arready      ,
+  output wire [C_M13_AXI_ADDR_WIDTH-1:0]         m13_axi_araddr       ,
+  output wire [8-1:0]                            m13_axi_arlen        ,
+  input  wire                                    m13_axi_rvalid       ,
+  output wire                                    m13_axi_rready       ,
+  input  wire [C_M13_AXI_DATA_WIDTH-1:0]         m13_axi_rdata        ,
+  input  wire                                    m13_axi_rlast        ,
+  // AXI4 master interface m14_axi
+  output wire                                    m14_axi_awvalid      ,
+  input  wire                                    m14_axi_awready      ,
+  output wire [C_M14_AXI_ADDR_WIDTH-1:0]         m14_axi_awaddr       ,
+  output wire [8-1:0]                            m14_axi_awlen        ,
+  output wire                                    m14_axi_wvalid       ,
+  input  wire                                    m14_axi_wready       ,
+  output wire [C_M14_AXI_DATA_WIDTH-1:0]         m14_axi_wdata        ,
+  output wire [C_M14_AXI_DATA_WIDTH/8-1:0]       m14_axi_wstrb        ,
+  output wire                                    m14_axi_wlast        ,
+  input  wire                                    m14_axi_bvalid       ,
+  output wire                                    m14_axi_bready       ,
+  output wire                                    m14_axi_arvalid      ,
+  input  wire                                    m14_axi_arready      ,
+  output wire [C_M14_AXI_ADDR_WIDTH-1:0]         m14_axi_araddr       ,
+  output wire [8-1:0]                            m14_axi_arlen        ,
+  input  wire                                    m14_axi_rvalid       ,
+  output wire                                    m14_axi_rready       ,
+  input  wire [C_M14_AXI_DATA_WIDTH-1:0]         m14_axi_rdata        ,
+  input  wire                                    m14_axi_rlast        ,
+  // AXI4 master interface m15_axi
+  output wire                                    m15_axi_awvalid      ,
+  input  wire                                    m15_axi_awready      ,
+  output wire [C_M15_AXI_ADDR_WIDTH-1:0]         m15_axi_awaddr       ,
+  output wire [8-1:0]                            m15_axi_awlen        ,
+  output wire                                    m15_axi_wvalid       ,
+  input  wire                                    m15_axi_wready       ,
+  output wire [C_M15_AXI_DATA_WIDTH-1:0]         m15_axi_wdata        ,
+  output wire [C_M15_AXI_DATA_WIDTH/8-1:0]       m15_axi_wstrb        ,
+  output wire                                    m15_axi_wlast        ,
+  input  wire                                    m15_axi_bvalid       ,
+  output wire                                    m15_axi_bready       ,
+  output wire                                    m15_axi_arvalid      ,
+  input  wire                                    m15_axi_arready      ,
+  output wire [C_M15_AXI_ADDR_WIDTH-1:0]         m15_axi_araddr       ,
+  output wire [8-1:0]                            m15_axi_arlen        ,
+  input  wire                                    m15_axi_rvalid       ,
+  output wire                                    m15_axi_rready       ,
+  input  wire [C_M15_AXI_DATA_WIDTH-1:0]         m15_axi_rdata        ,
+  input  wire                                    m15_axi_rlast        ,
+  // AXI4 master interface m16_axi
+  output wire                                    m16_axi_awvalid      ,
+  input  wire                                    m16_axi_awready      ,
+  output wire [C_M16_AXI_ADDR_WIDTH-1:0]         m16_axi_awaddr       ,
+  output wire [8-1:0]                            m16_axi_awlen        ,
+  output wire                                    m16_axi_wvalid       ,
+  input  wire                                    m16_axi_wready       ,
+  output wire [C_M16_AXI_DATA_WIDTH-1:0]         m16_axi_wdata        ,
+  output wire [C_M16_AXI_DATA_WIDTH/8-1:0]       m16_axi_wstrb        ,
+  output wire                                    m16_axi_wlast        ,
+  input  wire                                    m16_axi_bvalid       ,
+  output wire                                    m16_axi_bready       ,
+  output wire                                    m16_axi_arvalid      ,
+  input  wire                                    m16_axi_arready      ,
+  output wire [C_M16_AXI_ADDR_WIDTH-1:0]         m16_axi_araddr       ,
+  output wire [8-1:0]                            m16_axi_arlen        ,
+  input  wire                                    m16_axi_rvalid       ,
+  output wire                                    m16_axi_rready       ,
+  input  wire [C_M16_AXI_DATA_WIDTH-1:0]         m16_axi_rdata        ,
+  input  wire                                    m16_axi_rlast        ,
+  // AXI4 master interface m17_axi
+  output wire                                    m17_axi_awvalid      ,
+  input  wire                                    m17_axi_awready      ,
+  output wire [C_M17_AXI_ADDR_WIDTH-1:0]         m17_axi_awaddr       ,
+  output wire [8-1:0]                            m17_axi_awlen        ,
+  output wire                                    m17_axi_wvalid       ,
+  input  wire                                    m17_axi_wready       ,
+  output wire [C_M17_AXI_DATA_WIDTH-1:0]         m17_axi_wdata        ,
+  output wire [C_M17_AXI_DATA_WIDTH/8-1:0]       m17_axi_wstrb        ,
+  output wire                                    m17_axi_wlast        ,
+  input  wire                                    m17_axi_bvalid       ,
+  output wire                                    m17_axi_bready       ,
+  output wire                                    m17_axi_arvalid      ,
+  input  wire                                    m17_axi_arready      ,
+  output wire [C_M17_AXI_ADDR_WIDTH-1:0]         m17_axi_araddr       ,
+  output wire [8-1:0]                            m17_axi_arlen        ,
+  input  wire                                    m17_axi_rvalid       ,
+  output wire                                    m17_axi_rready       ,
+  input  wire [C_M17_AXI_DATA_WIDTH-1:0]         m17_axi_rdata        ,
+  input  wire                                    m17_axi_rlast        ,
+  // AXI4 master interface m18_axi
+  output wire                                    m18_axi_awvalid      ,
+  input  wire                                    m18_axi_awready      ,
+  output wire [C_M18_AXI_ADDR_WIDTH-1:0]         m18_axi_awaddr       ,
+  output wire [8-1:0]                            m18_axi_awlen        ,
+  output wire                                    m18_axi_wvalid       ,
+  input  wire                                    m18_axi_wready       ,
+  output wire [C_M18_AXI_DATA_WIDTH-1:0]         m18_axi_wdata        ,
+  output wire [C_M18_AXI_DATA_WIDTH/8-1:0]       m18_axi_wstrb        ,
+  output wire                                    m18_axi_wlast        ,
+  input  wire                                    m18_axi_bvalid       ,
+  output wire                                    m18_axi_bready       ,
+  output wire                                    m18_axi_arvalid      ,
+  input  wire                                    m18_axi_arready      ,
+  output wire [C_M18_AXI_ADDR_WIDTH-1:0]         m18_axi_araddr       ,
+  output wire [8-1:0]                            m18_axi_arlen        ,
+  input  wire                                    m18_axi_rvalid       ,
+  output wire                                    m18_axi_rready       ,
+  input  wire [C_M18_AXI_DATA_WIDTH-1:0]         m18_axi_rdata        ,
+  input  wire                                    m18_axi_rlast        ,
+  // AXI4 master interface m19_axi
+  output wire                                    m19_axi_awvalid      ,
+  input  wire                                    m19_axi_awready      ,
+  output wire [C_M19_AXI_ADDR_WIDTH-1:0]         m19_axi_awaddr       ,
+  output wire [8-1:0]                            m19_axi_awlen        ,
+  output wire                                    m19_axi_wvalid       ,
+  input  wire                                    m19_axi_wready       ,
+  output wire [C_M19_AXI_DATA_WIDTH-1:0]         m19_axi_wdata        ,
+  output wire [C_M19_AXI_DATA_WIDTH/8-1:0]       m19_axi_wstrb        ,
+  output wire                                    m19_axi_wlast        ,
+  input  wire                                    m19_axi_bvalid       ,
+  output wire                                    m19_axi_bready       ,
+  output wire                                    m19_axi_arvalid      ,
+  input  wire                                    m19_axi_arready      ,
+  output wire [C_M19_AXI_ADDR_WIDTH-1:0]         m19_axi_araddr       ,
+  output wire [8-1:0]                            m19_axi_arlen        ,
+  input  wire                                    m19_axi_rvalid       ,
+  output wire                                    m19_axi_rready       ,
+  input  wire [C_M19_AXI_DATA_WIDTH-1:0]         m19_axi_rdata        ,
+  input  wire                                    m19_axi_rlast        ,
+  // AXI4 master interface m20_axi
+  output wire                                    m20_axi_awvalid      ,
+  input  wire                                    m20_axi_awready      ,
+  output wire [C_M20_AXI_ADDR_WIDTH-1:0]         m20_axi_awaddr       ,
+  output wire [8-1:0]                            m20_axi_awlen        ,
+  output wire                                    m20_axi_wvalid       ,
+  input  wire                                    m20_axi_wready       ,
+  output wire [C_M20_AXI_DATA_WIDTH-1:0]         m20_axi_wdata        ,
+  output wire [C_M20_AXI_DATA_WIDTH/8-1:0]       m20_axi_wstrb        ,
+  output wire                                    m20_axi_wlast        ,
+  input  wire                                    m20_axi_bvalid       ,
+  output wire                                    m20_axi_bready       ,
+  output wire                                    m20_axi_arvalid      ,
+  input  wire                                    m20_axi_arready      ,
+  output wire [C_M20_AXI_ADDR_WIDTH-1:0]         m20_axi_araddr       ,
+  output wire [8-1:0]                            m20_axi_arlen        ,
+  input  wire                                    m20_axi_rvalid       ,
+  output wire                                    m20_axi_rready       ,
+  input  wire [C_M20_AXI_DATA_WIDTH-1:0]         m20_axi_rdata        ,
+  input  wire                                    m20_axi_rlast        ,
+  // AXI4-Lite slave interface
+  input  wire                                    s_axi_control_awvalid,
+  output wire                                    s_axi_control_awready,
+  input  wire [C_S_AXI_CONTROL_ADDR_WIDTH-1:0]   s_axi_control_awaddr ,
+  input  wire                                    s_axi_control_wvalid ,
+  output wire                                    s_axi_control_wready ,
+  input  wire [C_S_AXI_CONTROL_DATA_WIDTH-1:0]   s_axi_control_wdata  ,
+  input  wire [C_S_AXI_CONTROL_DATA_WIDTH/8-1:0] s_axi_control_wstrb  ,
+  input  wire                                    s_axi_control_arvalid,
+  output wire                                    s_axi_control_arready,
+  input  wire [C_S_AXI_CONTROL_ADDR_WIDTH-1:0]   s_axi_control_araddr ,
+  output wire                                    s_axi_control_rvalid ,
+  input  wire                                    s_axi_control_rready ,
+  output wire [C_S_AXI_CONTROL_DATA_WIDTH-1:0]   s_axi_control_rdata  ,
+  output wire [2-1:0]                            s_axi_control_rresp  ,
+  output wire                                    s_axi_control_bvalid ,
+  input  wire                                    s_axi_control_bready ,
+  output wire [2-1:0]                            s_axi_control_bresp  ,
+  output wire                                    interrupt            
+);
+
+///////////////////////////////////////////////////////////////////////////////
+// Local Parameters
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+// Wires and Variables
+///////////////////////////////////////////////////////////////////////////////
+(* DONT_TOUCH = "yes" *)
+reg                                 areset                         = 1'b0;
+wire                                ap_start                      ;
+wire                                ap_idle                       ;
+wire                                ap_done                       ;
+wire                                ap_ready                      ;
+wire [64-1:0]                       resptr                        ;
+wire [64-1:0]                       inptr                         ;
+wire [64-1:0]                       axi01_ptr0                    ;
+wire [64-1:0]                       axi02_ptr0                    ;
+wire [64-1:0]                       axi03_ptr0                    ;
+wire [64-1:0]                       axi04_ptr0                    ;
+wire [64-1:0]                       axi05_ptr0                    ;
+wire [64-1:0]                       axi06_ptr0                    ;
+wire [64-1:0]                       axi07_ptr0                    ;
+wire [64-1:0]                       axi08_ptr0                    ;
+wire [64-1:0]                       axi09_ptr0                    ;
+wire [64-1:0]                       axi10_ptr0                    ;
+wire [64-1:0]                       axi11_ptr0                    ;
+wire [64-1:0]                       axi12_ptr0                    ;
+wire [64-1:0]                       axi13_ptr0                    ;
+wire [64-1:0]                       axi14_ptr0                    ;
+wire [64-1:0]                       axi15_ptr0                    ;
+wire [64-1:0]                       axi16_ptr0                    ;
+wire [64-1:0]                       axi17_ptr0                    ;
+wire [64-1:0]                       axi18_ptr0                    ;
+wire [64-1:0]                       axi19_ptr0                    ;
+wire [64-1:0]                       axi20_ptr0                    ;
+
+// Register and invert reset signal.
+always @(posedge ap_clk) begin
+  areset <= ~ap_rst_n;
+end
+
+///////////////////////////////////////////////////////////////////////////////
+// Begin control interface RTL.  Modifying not recommended.
+///////////////////////////////////////////////////////////////////////////////
+
+
+// AXI4-Lite slave interface
+AXISIKS_Top_control_s_axi #(
+  .C_S_AXI_ADDR_WIDTH ( C_S_AXI_CONTROL_ADDR_WIDTH ),
+  .C_S_AXI_DATA_WIDTH ( C_S_AXI_CONTROL_DATA_WIDTH )
+)
+inst_control_s_axi (
+  .ACLK       ( ap_clk                ),
+  .ARESET     ( areset                ),
+  .ACLK_EN    ( 1'b1                  ),
+  .AWVALID    ( s_axi_control_awvalid ),
+  .AWREADY    ( s_axi_control_awready ),
+  .AWADDR     ( s_axi_control_awaddr  ),
+  .WVALID     ( s_axi_control_wvalid  ),
+  .WREADY     ( s_axi_control_wready  ),
+  .WDATA      ( s_axi_control_wdata   ),
+  .WSTRB      ( s_axi_control_wstrb   ),
+  .ARVALID    ( s_axi_control_arvalid ),
+  .ARREADY    ( s_axi_control_arready ),
+  .ARADDR     ( s_axi_control_araddr  ),
+  .RVALID     ( s_axi_control_rvalid  ),
+  .RREADY     ( s_axi_control_rready  ),
+  .RDATA      ( s_axi_control_rdata   ),
+  .RRESP      ( s_axi_control_rresp   ),
+  .BVALID     ( s_axi_control_bvalid  ),
+  .BREADY     ( s_axi_control_bready  ),
+  .BRESP      ( s_axi_control_bresp   ),
+  .interrupt  ( interrupt             ),
+  .ap_start   ( ap_start              ),
+  .ap_done    ( ap_done               ),
+  .ap_ready   ( ap_ready              ),
+  .ap_idle    ( ap_idle               ),
+  .resptr     ( resptr                ),
+  .inptr      ( inptr                 ),
+  .axi01_ptr0 ( axi01_ptr0            ),
+  .axi02_ptr0 ( axi02_ptr0            ),
+  .axi03_ptr0 ( axi03_ptr0            ),
+  .axi04_ptr0 ( axi04_ptr0            ),
+  .axi05_ptr0 ( axi05_ptr0            ),
+  .axi06_ptr0 ( axi06_ptr0            ),
+  .axi07_ptr0 ( axi07_ptr0            ),
+  .axi08_ptr0 ( axi08_ptr0            ),
+  .axi09_ptr0 ( axi09_ptr0            ),
+  .axi10_ptr0 ( axi10_ptr0            ),
+  .axi11_ptr0 ( axi11_ptr0            ),
+  .axi12_ptr0 ( axi12_ptr0            ),
+  .axi13_ptr0 ( axi13_ptr0            ),
+  .axi14_ptr0 ( axi14_ptr0            ),
+  .axi15_ptr0 ( axi15_ptr0            ),
+  .axi16_ptr0 ( axi16_ptr0            ),
+  .axi17_ptr0 ( axi17_ptr0            ),
+  .axi18_ptr0 ( axi18_ptr0            ),
+  .axi19_ptr0 ( axi19_ptr0            ),
+  .axi20_ptr0 ( axi20_ptr0            )
+);
+
+///////////////////////////////////////////////////////////////////////////////
+// Add kernel logic here.  Modify/remove example code as necessary.
+///////////////////////////////////////////////////////////////////////////////
+
+wire axi4out_TVALID;
+wire axi4out_TREADY;
+wire [511:0] axi4out_TDATA;
+wire axi4outcmd_TVALID;
+wire axi4outcmd_TREADY;
+wire [103:0] axi4outcmd_TDATA;
+wire axi4in_TVALID;
+wire axi4in_TREADY;
+wire [511:0] axi4in_TDATA;
+wire axi4incmd_TVALID;
+wire axi4incmd_TREADY;
+wire [103:0] axi4incmd_TDATA;
+
+axi_datamover_0 datamover0 (
+  .m_axi_mm2s_aclk(ap_clk),                        // input wire m_axi_mm2s_aclk
+  .m_axi_mm2s_aresetn(ap_rst_n),                  // input wire m_axi_mm2s_aresetn
+  .mm2s_err(),                                      // output wire mm2s_err
+  .m_axis_mm2s_cmdsts_aclk(ap_clk),        // input wire m_axis_mm2s_cmdsts_aclk
+  .m_axis_mm2s_cmdsts_aresetn(ap_rst_n),  // input wire m_axis_mm2s_cmdsts_aresetn
+  .s_axis_mm2s_cmd_tvalid(axi4incmd_TVALID),          // input wire s_axis_mm2s_cmd_tvalid
+  .s_axis_mm2s_cmd_tready(axi4incmd_TREADY),          // output wire s_axis_mm2s_cmd_tready
+  .s_axis_mm2s_cmd_tdata(axi4incmd_TDATA),            // input wire [103 : 0] s_axis_mm2s_cmd_tdata
+  .m_axis_mm2s_sts_tvalid(),          // output wire m_axis_mm2s_sts_tvalid
+  .m_axis_mm2s_sts_tready(1'b1),          // input wire m_axis_mm2s_sts_tready
+  .m_axis_mm2s_sts_tdata(),            // output wire [7 : 0] m_axis_mm2s_sts_tdata
+  .m_axis_mm2s_sts_tkeep(),            // output wire [0 : 0] m_axis_mm2s_sts_tkeep
+  .m_axis_mm2s_sts_tlast(),            // output wire m_axis_mm2s_sts_tlast
+  .m_axi_mm2s_arid(),                        // output wire [3 : 0] m_axi_mm2s_arid
+  .m_axi_mm2s_araddr(m00_axi_araddr),                    // output wire [63 : 0] m_axi_mm2s_araddr
+  .m_axi_mm2s_arlen(m00_axi_arlen),                      // output wire [7 : 0] m_axi_mm2s_arlen
+  .m_axi_mm2s_arsize(),                    // output wire [2 : 0] m_axi_mm2s_arsize
+  .m_axi_mm2s_arburst(),                  // output wire [1 : 0] m_axi_mm2s_arburst
+  .m_axi_mm2s_arprot(),                    // output wire [2 : 0] m_axi_mm2s_arprot
+  .m_axi_mm2s_arcache(),                  // output wire [3 : 0] m_axi_mm2s_arcache
+  .m_axi_mm2s_aruser(),                    // output wire [3 : 0] m_axi_mm2s_aruser
+  .m_axi_mm2s_arvalid(m00_axi_arvalid),                  // output wire m_axi_mm2s_arvalid
+  .m_axi_mm2s_arready(m00_axi_arready),                  // input wire m_axi_mm2s_arready
+  .m_axi_mm2s_rdata(m00_axi_rdata),                      // input wire [511 : 0] m_axi_mm2s_rdata
+  .m_axi_mm2s_rresp(2'b0),                      // input wire [1 : 0] m_axi_mm2s_rresp
+  .m_axi_mm2s_rlast(m00_axi_rlast),                      // input wire m_axi_mm2s_rlast
+  .m_axi_mm2s_rvalid(m00_axi_rvalid),                    // input wire m_axi_mm2s_rvalid
+  .m_axi_mm2s_rready(m00_axi_rready),                    // output wire m_axi_mm2s_rready
+  .m_axis_mm2s_tdata(axi4in_TDATA),                    // output wire [511 : 0] m_axis_mm2s_tdata
+  .m_axis_mm2s_tkeep(),                    // output wire [63 : 0] m_axis_mm2s_tkeep
+  .m_axis_mm2s_tlast(),                    // output wire m_axis_mm2s_tlast
+  .m_axis_mm2s_tvalid(axi4in_TVALID),                  // output wire m_axis_mm2s_tvalid
+  .m_axis_mm2s_tready(axi4in_TREADY),                  // input wire m_axis_mm2s_tready
+  .m_axi_s2mm_aclk(ap_clk),                        // input wire m_axi_s2mm_aclk
+  .m_axi_s2mm_aresetn(ap_rst_n),                  // input wire m_axi_s2mm_aresetn
+  .s2mm_err(),                                      // output wire s2mm_err
+  .m_axis_s2mm_cmdsts_awclk(ap_clk),      // input wire m_axis_s2mm_cmdsts_awclk
+  .m_axis_s2mm_cmdsts_aresetn(ap_rst_n),  // input wire m_axis_s2mm_cmdsts_aresetn
+  .s_axis_s2mm_cmd_tvalid(axi4outcmd_TVALID),          // input wire s_axis_s2mm_cmd_tvalid
+  .s_axis_s2mm_cmd_tready(axi4outcmd_TREADY),          // output wire s_axis_s2mm_cmd_tready
+  .s_axis_s2mm_cmd_tdata(axi4outcmd_TDATA),            // input wire [103 : 0] s_axis_s2mm_cmd_tdata
+  .m_axis_s2mm_sts_tvalid(),          // output wire m_axis_s2mm_sts_tvalid
+  .m_axis_s2mm_sts_tready(1'b1),          // input wire m_axis_s2mm_sts_tready
+  .m_axis_s2mm_sts_tdata(),            // output wire [7 : 0] m_axis_s2mm_sts_tdata
+  .m_axis_s2mm_sts_tkeep(),            // output wire [0 : 0] m_axis_s2mm_sts_tkeep
+  .m_axis_s2mm_sts_tlast(),            // output wire m_axis_s2mm_sts_tlast
+  .m_axi_s2mm_awid(),                        // output wire [3 : 0] m_axi_s2mm_awid
+  .m_axi_s2mm_awaddr(m00_axi_awaddr),                    // output wire [63 : 0] m_axi_s2mm_awaddr
+  .m_axi_s2mm_awlen(m00_axi_awlen),                      // output wire [7 : 0] m_axi_s2mm_awlen
+  .m_axi_s2mm_awsize(),                    // output wire [2 : 0] m_axi_s2mm_awsize
+  .m_axi_s2mm_awburst(),                  // output wire [1 : 0] m_axi_s2mm_awburst
+  .m_axi_s2mm_awprot(),                    // output wire [2 : 0] m_axi_s2mm_awprot
+  .m_axi_s2mm_awcache(),                  // output wire [3 : 0] m_axi_s2mm_awcache
+  .m_axi_s2mm_awuser(),                    // output wire [3 : 0] m_axi_s2mm_awuser
+  .m_axi_s2mm_awvalid(m00_axi_awvalid),                  // output wire m_axi_s2mm_awvalid
+  .m_axi_s2mm_awready(m00_axi_awready),                  // input wire m_axi_s2mm_awready
+  .m_axi_s2mm_wdata(m00_axi_wdata),                      // output wire [511 : 0] m_axi_s2mm_wdata
+  .m_axi_s2mm_wstrb(m00_axi_wstrb),                      // output wire [63 : 0] m_axi_s2mm_wstrb
+  .m_axi_s2mm_wlast(m00_axi_wlast),                      // output wire m_axi_s2mm_wlast
+  .m_axi_s2mm_wvalid(m00_axi_wvalid),                    // output wire m_axi_s2mm_wvalid
+  .m_axi_s2mm_wready(m00_axi_wready),                    // input wire m_axi_s2mm_wready
+  .m_axi_s2mm_bresp(2'b0),                      // input wire [1 : 0] m_axi_s2mm_bresp
+  .m_axi_s2mm_bvalid(m00_axi_bvalid),                    // input wire m_axi_s2mm_bvalid
+  .m_axi_s2mm_bready(m00_axi_bready),                    // output wire m_axi_s2mm_bready
+  .s_axis_s2mm_tdata(axi4out_TDATA),                    // input wire [511 : 0] s_axis_s2mm_tdata
+  .s_axis_s2mm_tkeep(),                    // input wire [63 : 0] s_axis_s2mm_tkeep
+  .s_axis_s2mm_tlast(),                    // input wire s_axis_s2mm_tlast
+  .s_axis_s2mm_tvalid(axi4out_TVALID),                  // input wire s_axis_s2mm_tvalid
+  .s_axis_s2mm_tready(axi4out_TREADY)                  // output wire s_axis_s2mm_tready
+);
+
+{%- for bus in buss %}
+
+wire axi4ikskin_{{ bus[1] }}_TVALID;
+wire axi4ikskin_{{ bus[1] }}_TREADY;
+wire [255:0] axi4ikskin_{{ bus[1] }}_TDATA;
+
+wire axi4ikskincmd_{{ bus[1] }}_TVALID;
+wire axi4ikskincmd_{{ bus[1] }}_TREADY;
+wire [103:0] axi4ikskincmd_{{ bus[1] }}_TDATA;
+
+axi_datamover_1 datamover{{ bus[0] }} (
+  .m_axi_mm2s_aclk(ap_clk),                        // input wire m_axi_mm2s_aclk
+  .m_axi_mm2s_aresetn(ap_rst_n),                  // input wire m_axi_mm2s_aresetn
+  .mm2s_err(),                                      // output wire mm2s_err
+  .m_axis_mm2s_cmdsts_aclk(ap_clk),        // input wire m_axis_mm2s_cmdsts_aclk
+  .m_axis_mm2s_cmdsts_aresetn(ap_rst_n),  // input wire m_axis_mm2s_cmdsts_aresetn
+  .s_axis_mm2s_cmd_tvalid(axi4ikskincmd_{{ bus[1] }}_TVALID),          // input wire s_axis_mm2s_cmd_tvalid
+  .s_axis_mm2s_cmd_tready(axi4ikskincmd_{{ bus[1] }}_TREADY),          // output wire s_axis_mm2s_cmd_tready
+  .s_axis_mm2s_cmd_tdata(axi4ikskincmd_{{ bus[1] }}_TDATA),            // input wire [103 : 0] s_axis_mm2s_cmd_tdata
+  .m_axis_mm2s_sts_tvalid(),          // output wire m_axis_mm2s_sts_tvalid
+  .m_axis_mm2s_sts_tready(ap_rst_n),          // input wire m_axis_mm2s_sts_tready
+  .m_axis_mm2s_sts_tdata(),            // output wire [7 : 0] m_axis_mm2s_sts_tdata
+  .m_axis_mm2s_sts_tkeep(),            // output wire [0 : 0] m_axis_mm2s_sts_tkeep
+  .m_axis_mm2s_sts_tlast(),            // output wire m_axis_mm2s_sts_tlast
+  .m_axi_mm2s_arid(),                        // output wire [3 : 0] m_axi_mm2s_arid
+  .m_axi_mm2s_araddr(m{{ bus[0] }}_axi_araddr),                    // output wire [63 : 0] m_axi_mm2s_araddr
+  .m_axi_mm2s_arlen(m{{ bus[0] }}_axi_arlen),                      // output wire [7 : 0] m_axi_mm2s_arlen
+  .m_axi_mm2s_arsize(),                    // output wire [2 : 0] m_axi_mm2s_arsize
+  .m_axi_mm2s_arburst(),                  // output wire [1 : 0] m_axi_mm2s_arburst
+  .m_axi_mm2s_arprot(),                    // output wire [2 : 0] m_axi_mm2s_arprot
+  .m_axi_mm2s_arcache(),                  // output wire [3 : 0] m_axi_mm2s_arcache
+  .m_axi_mm2s_aruser(),                    // output wire [3 : 0] m_axi_mm2s_aruser
+  .m_axi_mm2s_arvalid(m{{ bus[0] }}_axi_arvalid),                  // output wire m_axi_mm2s_arvalid
+  .m_axi_mm2s_arready(m{{ bus[0] }}_axi_arready),                  // input wire m_axi_mm2s_arready
+  .m_axi_mm2s_rdata(m{{ bus[0] }}_axi_rdata),                      // input wire [511 : 0] m_axi_mm2s_rdata
+  .m_axi_mm2s_rresp(2'b0),                      // input wire [1 : 0] m_axi_mm2s_rresp
+  .m_axi_mm2s_rlast(m{{ bus[0] }}_axi_rlast),                      // input wire m_axi_mm2s_rlast
+  .m_axi_mm2s_rvalid(m{{ bus[0] }}_axi_rvalid),                    // input wire m_axi_mm2s_rvalid
+  .m_axi_mm2s_rready(m{{ bus[0] }}_axi_rready),                    // output wire m_axi_mm2s_rready
+  .m_axis_mm2s_tdata(axi4ikskin_{{ bus[1] }}_TDATA),                    // output wire [511 : 0] m_axis_mm2s_tdata
+  .m_axis_mm2s_tkeep(),                    // output wire [63 : 0] m_axis_mm2s_tkeep
+  .m_axis_mm2s_tlast(),                    // output wire m_axis_mm2s_tlast
+  .m_axis_mm2s_tvalid(axi4ikskin_{{ bus[1] }}_TVALID),                  // output wire m_axis_mm2s_tvalid
+  .m_axis_mm2s_tready(axi4ikskin_{{ bus[1] }}_TREADY)                 // input wire m_axis_mm2s_tready
+);
+{%- endfor %} 
+
+AXI4IKS axi4iks(
+  .clock(ap_clk),
+  .reset(areset),
+  .io_axi4out_TVALID(axi4out_TVALID),
+  .io_axi4out_TREADY(axi4out_TREADY),
+  .io_axi4out_TDATA(axi4out_TDATA),
+  .io_axi4in_TVALID(axi4in_TVALID),
+  .io_axi4in_TREADY(axi4in_TREADY),
+  .io_axi4in_TDATA(axi4in_TDATA),
+  {%- for bus in buss %}
+  .io_axi4ikskin_{{ bus[1] }}_TVALID(axi4ikskin_{{ bus[1] }}_TVALID),
+  .io_axi4ikskin_{{ bus[1] }}_TREADY(axi4ikskin_{{ bus[1] }}_TREADY),
+  .io_axi4ikskin_{{ bus[1] }}_TDATA(axi4ikskin_{{ bus[1] }}_TDATA),
+  {%- endfor %}
+  .io_axi4outcmd_TVALID(axi4outcmd_TVALID),
+  .io_axi4outcmd_TREADY(axi4outcmd_TREADY),
+  .io_axi4outcmd_TDATA(axi4outcmd_TDATA),
+  .io_axi4incmd_TVALID(axi4incmd_TVALID),
+  .io_axi4incmd_TREADY(axi4incmd_TREADY),
+  .io_axi4incmd_TDATA(axi4incmd_TDATA),
+  {%- for bus in buss %}
+  .io_axi4ikskincmd_{{ bus[1] }}_TVALID(axi4ikskincmd_{{ bus[1] }}_TVALID),
+  .io_axi4ikskincmd_{{ bus[1] }}_TREADY(axi4ikskincmd_{{ bus[1] }}_TREADY),
+  .io_axi4ikskincmd_{{ bus[1] }}_TDATA(axi4ikskincmd_{{ bus[1] }}_TDATA),
+  {%- endfor %}
+  .io_outaddr(resptr),
+  .io_inaddr(inptr),
+  {%- for bus in buss %}
+  .io_ikskaddr_{{ bus[1] }}(axi{{ bus[0] }}_ptr0),
+  {%- endfor %}
+  .io_ap_start(ap_start),
+  .io_ap_done(ap_done),
+  .io_ap_idle(ap_idle),
+  .io_ap_ready(ap_ready)
+);
+
+endmodule
+`default_nettype wire

@@ -1,0 +1,198 @@
+// This is a generated file. Use and modify at your own risk.
+//////////////////////////////////////////////////////////////////////////////// 
+// default_nettype of none prevents implicit wire declaration.
+`default_nettype none
+`timescale 1 ns / 1 ps
+// Top level of the kernel. Do not modify module name, parameters or ports.
+module AXI4ExtpMiddleTop #(
+  parameter integer C_AXIS00_TDATA_WIDTH = 512,
+  parameter integer C_AXIS01_TDATA_WIDTH = 512,
+  parameter integer C_AXIS02_TDATA_WIDTH = 512,
+  parameter integer C_AXIS03_TDATA_WIDTH = 512,
+  parameter integer C_AXIS04_TDATA_WIDTH = 512,
+  parameter integer C_AXIS05_TDATA_WIDTH = 512,
+  parameter integer C_AXIS06_TDATA_WIDTH = 512,
+  parameter integer C_AXIS07_TDATA_WIDTH = 512,
+  parameter integer C_AXIS08_TDATA_WIDTH = 512,
+  parameter integer C_AXIS09_TDATA_WIDTH = 512,
+  parameter integer C_AXIS10_TDATA_WIDTH = 512,
+  parameter integer C_AXIS11_TDATA_WIDTH = 512,
+  parameter integer C_AXIS12_TDATA_WIDTH = 512,
+  parameter integer C_AXIS13_TDATA_WIDTH = 512,
+  parameter integer C_AXIS14_TDATA_WIDTH = 512,
+  parameter integer C_AXIS15_TDATA_WIDTH = 512
+)
+(
+  // System Signals
+  input  wire                              ap_clk       ,
+  input  wire                              ap_rst_n     ,
+  //  Note: A minimum subset of AXI4 memory mapped signals are declared.  AXI
+  // signals omitted from these interfaces are automatically inferred with the
+  // optimal values for Xilinx accleration platforms.  This allows Xilinx AXI4 Interconnects
+  // within the system to be optimized by removing logic for AXI4 protocol
+  // features that are not necessary. When adapting AXI4 masters within the RTL
+  // kernel that have signals not declared below, it is suitable to add the
+  // signals to the declarations below to connect them to the AXI4 Master.
+  // 
+  // List of ommited signals - effect
+  // -------------------------------
+  // ID - Transaction ID are used for multithreading and out of order
+  // transactions.  This increases complexity. This saves logic and increases Fmax
+  // in the system when ommited.
+  // SIZE - Default value is log2(data width in bytes). Needed for subsize bursts.
+  // This saves logic and increases Fmax in the system when ommited.
+  // BURST - Default value (0b01) is incremental.  Wrap and fixed bursts are not
+  // recommended. This saves logic and increases Fmax in the system when ommited.
+  // LOCK - Not supported in AXI4
+  // CACHE - Default value (0b0011) allows modifiable transactions. No benefit to
+  // changing this.
+  // PROT - Has no effect in current acceleration platforms.
+  // QOS - Has no effect in current acceleration platforms.
+  // REGION - Has no effect in current acceleration platforms.
+  // USER - Has no effect in current acceleration platforms.
+  // RESP - Not useful in most acceleration platforms.
+  // 
+  // AXI4-Stream (slave) interface axis00
+  input  wire                              axis00_tvalid,
+  output wire                              axis00_tready,
+  input  wire [C_AXIS00_TDATA_WIDTH-1:0]   axis00_tdata ,
+  input  wire [C_AXIS00_TDATA_WIDTH/8-1:0] axis00_tkeep ,
+  input  wire                              axis00_tlast ,
+  // AXI4-Stream (slave) interface axis01
+  input  wire                              axis01_tvalid,
+  output wire                              axis01_tready,
+  input  wire [C_AXIS01_TDATA_WIDTH-1:0]   axis01_tdata ,
+  input  wire [C_AXIS01_TDATA_WIDTH/8-1:0] axis01_tkeep ,
+  input  wire                              axis01_tlast ,
+  // AXI4-Stream (slave) interface axis02
+  input  wire                              axis02_tvalid,
+  output wire                              axis02_tready,
+  input  wire [C_AXIS02_TDATA_WIDTH-1:0]   axis02_tdata ,
+  input  wire [C_AXIS02_TDATA_WIDTH/8-1:0] axis02_tkeep ,
+  input  wire                              axis02_tlast ,
+  // AXI4-Stream (slave) interface axis03
+  input  wire                              axis03_tvalid,
+  output wire                              axis03_tready,
+  input  wire [C_AXIS03_TDATA_WIDTH-1:0]   axis03_tdata ,
+  input  wire [C_AXIS03_TDATA_WIDTH/8-1:0] axis03_tkeep ,
+  input  wire                              axis03_tlast ,
+  // AXI4-Stream (master) interface axis04
+  output wire                              axis04_tvalid,
+  input  wire                              axis04_tready,
+  output wire [C_AXIS04_TDATA_WIDTH-1:0]   axis04_tdata ,
+  output wire [C_AXIS04_TDATA_WIDTH/8-1:0] axis04_tkeep ,
+  output wire                              axis04_tlast ,
+  // AXI4-Stream (master) interface axis05
+  output wire                              axis05_tvalid,
+  input  wire                              axis05_tready,
+  output wire [C_AXIS05_TDATA_WIDTH-1:0]   axis05_tdata ,
+  output wire [C_AXIS05_TDATA_WIDTH/8-1:0] axis05_tkeep ,
+  output wire                              axis05_tlast ,
+  // AXI4-Stream (master) interface axis06
+  output wire                              axis06_tvalid,
+  input  wire                              axis06_tready,
+  output wire [C_AXIS06_TDATA_WIDTH-1:0]   axis06_tdata ,
+  output wire [C_AXIS06_TDATA_WIDTH/8-1:0] axis06_tkeep ,
+  output wire                              axis06_tlast ,
+  // AXI4-Stream (master) interface axis07
+  output wire                              axis07_tvalid,
+  input  wire                              axis07_tready,
+  output wire [C_AXIS07_TDATA_WIDTH-1:0]   axis07_tdata ,
+  output wire [C_AXIS07_TDATA_WIDTH/8-1:0] axis07_tkeep ,
+  output wire                              axis07_tlast ,
+  // AXI4-Stream (slave) interface axis08
+  input  wire                              axis08_tvalid,
+  output wire                              axis08_tready,
+  input  wire [C_AXIS08_TDATA_WIDTH-1:0]   axis08_tdata ,
+  input  wire [C_AXIS08_TDATA_WIDTH/8-1:0] axis08_tkeep ,
+  input  wire                              axis08_tlast ,
+  // AXI4-Stream (slave) interface axis09
+  input  wire                              axis09_tvalid,
+  output wire                              axis09_tready,
+  input  wire [C_AXIS09_TDATA_WIDTH-1:0]   axis09_tdata ,
+  input  wire [C_AXIS09_TDATA_WIDTH/8-1:0] axis09_tkeep ,
+  input  wire                              axis09_tlast ,
+  // AXI4-Stream (slave) interface axis10
+  input  wire                              axis10_tvalid,
+  output wire                              axis10_tready,
+  input  wire [C_AXIS10_TDATA_WIDTH-1:0]   axis10_tdata ,
+  input  wire [C_AXIS10_TDATA_WIDTH/8-1:0] axis10_tkeep ,
+  input  wire                              axis10_tlast ,
+  // AXI4-Stream (slave) interface axis11
+  input  wire                              axis11_tvalid,
+  output wire                              axis11_tready,
+  input  wire [C_AXIS11_TDATA_WIDTH-1:0]   axis11_tdata ,
+  input  wire [C_AXIS11_TDATA_WIDTH/8-1:0] axis11_tkeep ,
+  input  wire                              axis11_tlast ,
+  // AXI4-Stream (slave) interface axis12
+  input  wire                              axis12_tvalid,
+  output wire                              axis12_tready,
+  input  wire [C_AXIS12_TDATA_WIDTH-1:0]   axis12_tdata ,
+  input  wire [C_AXIS12_TDATA_WIDTH/8-1:0] axis12_tkeep ,
+  input  wire                              axis12_tlast ,
+  // AXI4-Stream (slave) interface axis13
+  input  wire                              axis13_tvalid,
+  output wire                              axis13_tready,
+  input  wire [C_AXIS13_TDATA_WIDTH-1:0]   axis13_tdata ,
+  input  wire [C_AXIS13_TDATA_WIDTH/8-1:0] axis13_tkeep ,
+  input  wire                              axis13_tlast ,
+  // AXI4-Stream (slave) interface axis14
+  input  wire                              axis14_tvalid,
+  output wire                              axis14_tready,
+  input  wire [C_AXIS14_TDATA_WIDTH-1:0]   axis14_tdata ,
+  input  wire [C_AXIS14_TDATA_WIDTH/8-1:0] axis14_tkeep ,
+  input  wire                              axis14_tlast ,
+  // AXI4-Stream (slave) interface axis15
+  input  wire                              axis15_tvalid,
+  output wire                              axis15_tready,
+  input  wire [C_AXIS15_TDATA_WIDTH-1:0]   axis15_tdata ,
+  input  wire [C_AXIS15_TDATA_WIDTH/8-1:0] axis15_tkeep ,
+  input  wire                              axis15_tlast 
+);
+
+///////////////////////////////////////////////////////////////////////////////
+// Local Parameters
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+// Wires and Variables
+///////////////////////////////////////////////////////////////////////////////
+(* DONT_TOUCH = "yes" *)
+reg                                 areset                         = 1'b0;
+
+// Register and invert reset signal.
+always @(posedge ap_clk) begin
+  areset <= ~ap_rst_n;
+end
+
+///////////////////////////////////////////////////////////////////////////////
+// Begin control interface RTL.  Modifying not recommended.
+///////////////////////////////////////////////////////////////////////////////
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Add kernel logic here.  Modify/remove example code as necessary.
+///////////////////////////////////////////////////////////////////////////////
+
+AXI4ExtpMiddle axi4extpmiddle(
+  .clock(ap_clk),
+  {%- for bus in formerbuss %}
+  .io_axi4sin_{{ bus[1] }}_TVALID(axis{{ bus[0] }}_tvalid),
+  .io_axi4sin_{{ bus[1] }}_TREADY(axis{{ bus[0] }}_tready),
+  .io_axi4sin_{{ bus[1] }}_TDATA(axis{{ bus[0] }}_tdata),
+  {%- endfor %}
+  {%- for bus in laterbuss %}
+  .io_axi4sout_{{ bus[1] }}_TVALID(axis{{ bus[0] }}_tvalid),
+  .io_axi4sout_{{ bus[1] }}_TREADY(axis{{ bus[0] }}_tready),
+  .io_axi4sout_{{ bus[1] }}_TDATA(axis{{ bus[0] }}_tdata),
+  {%- endfor %}
+  {%- for bus in buss %}
+  .io_axi4bkin_{{ bus[1] }}_TVALID(axis{{ bus[2] }}_tvalid),
+  .io_axi4bkin_{{ bus[1] }}_TREADY(axis{{ bus[2] }}_tready),
+  .io_axi4bkin_{{ bus[1] }}_TDATA(axis{{ bus[2] }}_tdata),
+  {%- endfor %}
+  .reset(areset)
+);
+
+endmodule
+`default_nettype wire

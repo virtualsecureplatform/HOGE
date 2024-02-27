@@ -1,0 +1,21 @@
+import chisel3._
+import chisel3.util._
+
+class XaittROM() extends Module{
+    val io = IO(new Bundle{
+        val abar = Input(UInt({{ Nbit + 1}}.W))
+        val row = Input(UInt({{ rowbit }}.W))
+        val out = Output(Vec({{ numwords }},UInt(64.W)))
+    })
+    {%- for word in range(numwords) %}
+    val data{{ word }} = VecInit(
+    {%- for index in range(lenxaitt//numwords) %}
+    BigInt("{{ xaitt[index * numwords + word] }}").U,
+    {%- endfor %}
+    )
+    {%- endfor %}
+    val index = (io.abar << {{ rowbit }}) + io.row
+    {%- for word in range(numwords) %}
+    io.out({{ word }}) = data{{ word }}(index)
+    {%- endfor %}
+}
