@@ -1,14 +1,16 @@
 name := "Purple-Sapphier"
 
-scalaVersion := "2.13.8"
-
-addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin" % "3.5.4" cross CrossVersion.full)
+scalaVersion := "2.13.12"
+val chiselVersion = "5.0.0"
+// addCompilerPlugin("org.chipsalliance" % "chisel-plugin" % chiselVersion cross CrossVersion.full)
+addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin" % "3.6.1" cross CrossVersion.full)
 
 resolvers ++= Resolver.sonatypeOssRepos("releases")
 
 libraryDependencies ++= Seq(
-    "edu.berkeley.cs" %% "chisel3" % "3.5.4",
-    "edu.berkeley.cs" %% "chiseltest" % "0.5.4"
+    // "org.chipsalliance" %% "chisel" % chiselVersion,
+    "edu.berkeley.cs" %% "chisel3" % "3.6.1",
+    // "edu.berkeley.cs" %% "chiseltest" % "0.6.0"
 )
 
 scalacOptions ++= Seq(
