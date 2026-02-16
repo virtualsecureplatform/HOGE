@@ -192,10 +192,11 @@ if [ "${RUN_TEST}" = true ]; then
     echo "============================================"
     echo "Step 6: Building nand test binary..."
     echo "============================================"
-    TEST_BUILD_DIR="${REPO_DIR}/build"
+    TEST_BUILD_DIR="${BUILD_DIR}/nand_build"
     mkdir -p "${TEST_BUILD_DIR}"
     cd "${TEST_BUILD_DIR}"
-    cmake "${REPO_DIR}" -G "Unix Makefiles"
+    # Use /usr/bin/cmake to avoid Vitis's bundled cmake 3.3.2 (too old, need >= 3.18)
+    /usr/bin/cmake "${REPO_DIR}" -G "Unix Makefiles"
     make -j$(nproc) nand
     cd "${REPO_DIR}"
     NAND_BIN="${TEST_BUILD_DIR}/xcltest/HomGate/nand"
