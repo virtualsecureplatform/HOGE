@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root versionMajor="1" versionMinor="6">
+  <kernel name="BRFront" language="ip_c" vlnv="mycompany.com:kernel:BRFront:1.0" attributes="" preferredWorkGroupSizeMultiple="0" workGroupSize="1" interrupt="false" hwControlProtocol="ap_ctrl_none">
+    <ports>
+      <port name="axis00" mode="read_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis01" mode="write_only" range="" dataWidth="32" portType="stream" base=""/>
+      <port name="axis02" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis03" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis04" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis05" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis06" mode="read_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis07" mode="read_only" range="" dataWidth="512" portType="stream" base=""/>
+    </ports>
+    <args>
+      <arg name="axis00" addressQualifier="4" id="0" port="axis00" size="0x4" offset="0x010" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis01" addressQualifier="4" id="1" port="axis01" size="0x4" offset="0x018" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;32,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis02" addressQualifier="4" id="2" port="axis02" size="0x4" offset="0x020" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis03" addressQualifier="4" id="3" port="axis03" size="0x4" offset="0x028" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis04" addressQualifier="4" id="4" port="axis04" size="0x4" offset="0x030" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis05" addressQualifier="4" id="5" port="axis05" size="0x4" offset="0x038" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis06" addressQualifier="4" id="6" port="axis06" size="0x4" offset="0x040" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis07" addressQualifier="4" id="7" port="axis07" size="0x4" offset="0x048" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+    </args>
+  </kernel>
+</root>

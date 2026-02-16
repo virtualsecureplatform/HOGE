@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root versionMajor="1" versionMinor="6">
+  <kernel name="HomGate" language="ip_c" vlnv="mycompany.com:kernel:HomGate:1.0" attributes="" preferredWorkGroupSizeMultiple="0" workGroupSize="1" interrupt="true" hwControlProtocol="ap_ctrl_hs">
+    <ports>
+      <port name="s_axi_control" mode="slave" range="0x1000" dataWidth="32" portType="addressable" base="0x0"/>
+      <port name="m00_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m01_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m02_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m03_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m04_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m05_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m06_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m07_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m08_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m09_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m10_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m11_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m12_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m13_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m14_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m15_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m16_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m17_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m18_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m19_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="m20_axi" mode="master" range="0xFFFFFFFFFFFFFFFF" dataWidth="512" portType="addressable" base="0x0"/>
+      <port name="axis00" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis01" mode="read_only" range="" dataWidth="32" portType="stream" base=""/>
+      <port name="axis02" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis03" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis04" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis05" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis06" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis07" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis08" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+      <port name="axis09" mode="write_only" range="" dataWidth="512" portType="stream" base=""/>
+    </ports>
+    <args>
+      <arg name="scaledaindex" addressQualifier="0" id="0" port="s_axi_control" size="0x4" offset="0x010" hostOffset="0x0" hostSize="0x2" type="ushort"/>
+      <arg name="scaledbindex" addressQualifier="0" id="1" port="s_axi_control" size="0x4" offset="0x018" hostOffset="0x0" hostSize="0x2" type="ushort"/>
+      <arg name="offsetindex" addressQualifier="0" id="2" port="s_axi_control" size="0x4" offset="0x020" hostOffset="0x0" hostSize="0x2" type="ushort"/>
+      <arg name="axi00_ptr0" addressQualifier="1" id="3" port="m00_axi" size="0x8" offset="0x028" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi01_ptr0" addressQualifier="1" id="4" port="m01_axi" size="0x8" offset="0x034" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi02_ptr0" addressQualifier="1" id="5" port="m02_axi" size="0x8" offset="0x040" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi03_ptr0" addressQualifier="1" id="6" port="m03_axi" size="0x8" offset="0x04c" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi04_ptr0" addressQualifier="1" id="7" port="m04_axi" size="0x8" offset="0x058" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi05_ptr0" addressQualifier="1" id="8" port="m05_axi" size="0x8" offset="0x064" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi06_ptr0" addressQualifier="1" id="9" port="m06_axi" size="0x8" offset="0x070" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi07_ptr0" addressQualifier="1" id="10" port="m07_axi" size="0x8" offset="0x07c" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi08_ptr0" addressQualifier="1" id="11" port="m08_axi" size="0x8" offset="0x088" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi09_ptr0" addressQualifier="1" id="12" port="m09_axi" size="0x8" offset="0x094" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi10_ptr0" addressQualifier="1" id="13" port="m10_axi" size="0x8" offset="0x0a0" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi11_ptr0" addressQualifier="1" id="14" port="m11_axi" size="0x8" offset="0x0ac" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi12_ptr0" addressQualifier="1" id="15" port="m12_axi" size="0x8" offset="0x0b8" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi13_ptr0" addressQualifier="1" id="16" port="m13_axi" size="0x8" offset="0x0c4" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi14_ptr0" addressQualifier="1" id="17" port="m14_axi" size="0x8" offset="0x0d0" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi15_ptr0" addressQualifier="1" id="18" port="m15_axi" size="0x8" offset="0x0dc" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi16_ptr0" addressQualifier="1" id="19" port="m16_axi" size="0x8" offset="0x0e8" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi17_ptr0" addressQualifier="1" id="20" port="m17_axi" size="0x8" offset="0x0f4" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi18_ptr0" addressQualifier="1" id="21" port="m18_axi" size="0x8" offset="0x100" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi19_ptr0" addressQualifier="1" id="22" port="m19_axi" size="0x8" offset="0x10c" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axi20_ptr0" addressQualifier="1" id="23" port="m20_axi" size="0x8" offset="0x118" hostOffset="0x0" hostSize="0x8" type="int*"/>
+      <arg name="axis00" addressQualifier="4" id="24" port="axis00" size="0x4" offset="0x120" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis01" addressQualifier="4" id="25" port="axis01" size="0x4" offset="0x128" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;32,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis02" addressQualifier="4" id="26" port="axis02" size="0x4" offset="0x130" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis03" addressQualifier="4" id="27" port="axis03" size="0x4" offset="0x138" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis04" addressQualifier="4" id="28" port="axis04" size="0x4" offset="0x140" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis05" addressQualifier="4" id="29" port="axis05" size="0x4" offset="0x148" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis06" addressQualifier="4" id="30" port="axis06" size="0x4" offset="0x150" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis07" addressQualifier="4" id="31" port="axis07" size="0x4" offset="0x158" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis08" addressQualifier="4" id="32" port="axis08" size="0x4" offset="0x160" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+      <arg name="axis09" addressQualifier="4" id="33" port="axis09" size="0x4" offset="0x168" hostOffset="0x0" hostSize="0x4" type="stream&lt;ap_axiu&lt;512,0,0,0&gt;&gt;&amp;"/>
+    </args>
+  </kernel>
+</root>

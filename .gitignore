@@ -1,2 +1,11 @@
 build
+build_verilator
 *.sif
+vitis/build/
+vitis/rtl/HomGateWrap.v
+*.backup.log
+*.backup.jou
+emulation_debug.log
+vivado.log
+vivado.jou
+*.log.bak
