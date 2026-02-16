@@ -125,6 +125,7 @@ class INTT(implicit val conf:Config) extends Module{
 
     inttlbuf.io.validin := io.validin && (cntreg === 0.U)
     io.validout := ShiftRegister(inttlbuf.io.validout,conf.radixdelay*conf.radixbit+1)
+
     when(io.validin){
         cntreg := cntreg + 1.U
         when(cntreg === (conf.numcycle-1).U){
@@ -165,6 +166,7 @@ class NTT(implicit val conf:Config) extends Module{
     }
 
     val cntreg = RegInit(0.U(conf.cyclebit.W))
+
     for(i <- 0 until conf.chunk){
         for(j <- 0 until conf.radix){
             formernttbuts(i).io.in(j) := RegNext(io.in(i)(j))
@@ -177,8 +179,9 @@ class NTT(implicit val conf:Config) extends Module{
         io.out(i) := RegNext(laternttbuts(i).io.out)
     }
 
-    nttlbuf.io.validin := io.validin && (cntreg === 0.U)
     io.validout := ShiftRegister(nttlbuf.io.validout,2+conf.muldelay+conf.radixdelay*conf.radixbit+conf.lshdelay+1)
+
+    nttlbuf.io.validin := io.validin && (cntreg === 0.U)
     when(io.validin){
         cntreg := cntreg + 1.U
         when(cntreg === (conf.numcycle-1).U){

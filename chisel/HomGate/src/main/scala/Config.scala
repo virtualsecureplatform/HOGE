@@ -44,6 +44,7 @@ case class Config() {
     val lshdelay = 3
     val interslr = 8
     val radixdelay = 5
+    val inttqueuedepth = 32
 
 
     //Constants

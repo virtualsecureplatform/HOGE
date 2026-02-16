@@ -145,6 +145,7 @@ class BlindRotate(implicit val conf:Config) extends Module{
 					statereg := BlindRotateState.PMBXMOWAIT
 				}.otherwise{
 					statereg := BlindRotateState.OUT
+					printf(p"BR_OUT_ENTER: brcntreg=${brcntreg} finreg=${finreg}\n")
 				}
 			}
 		}
@@ -230,6 +231,39 @@ class AXISBRMiddle(implicit val conf:Config) extends Module{
 	}
 	extpmiddle.io.trgswinvalid := Cat(tvalidvec).andR
 	extpmiddle.io.trgswin := Cat(tdatavec.reverse)
+
+	// Debug: per-channel BK beat counters (counts beats received from v++ FIFO, before register slices)
+	val bkbeattotal = RegInit(0.U(32.W))
+	val bkbeatvec = for(i <- 0 until conf.bknumbus) yield {
+		val cnt = RegInit(0.U(32.W))
+		when(io.axi4bkin(i).TVALID && io.axi4bkin(i).TREADY){
+			cnt := cnt + 1.U
+		}
+		cnt
+	}
+	when(io.axi4bkin(0).TVALID && io.axi4bkin(0).TREADY){
+		bkbeattotal := bkbeattotal + 1.U
+	}
+
+	// Debug: print BK channel stall periodically
+	val bkstallcnt = RegInit(0.U(32.W))
+	when(extpmiddle.io.trgswinready){
+		bkstallcnt := 0.U
+	}.otherwise{
+		bkstallcnt := bkstallcnt + 1.U
+	}
+	when(bkstallcnt === 5000.U){
+		bkstallcnt := 0.U
+		printf(p"BK_STALL: validvec=${Cat(tvalidvec)} andR=${Cat(tvalidvec).andR} ready=${extpmiddle.io.trgswinready} ch0=${bkbeatvec(0)} ch7=${bkbeatvec(7)} total=${bkbeattotal}\n")
+		// Print per-channel TVALID and TREADY at the register slice input
+		val inputValidVec = Wire(Vec(conf.bknumbus, Bool()))
+		val inputReadyVec = Wire(Vec(conf.bknumbus, Bool()))
+		for(i <- 0 until conf.bknumbus){
+			inputValidVec(i) := io.axi4bkin(i).TVALID
+			inputReadyVec(i) := io.axi4bkin(i).TREADY
+		}
+		printf(p"BK_INPUT: validIn=${Cat(inputValidVec)} readyIn=${Cat(inputReadyVec)}\n")
+	}
 }
 
 class AXISBRLater(implicit val conf:Config) extends Module{

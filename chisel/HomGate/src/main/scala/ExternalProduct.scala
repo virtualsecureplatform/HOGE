@@ -129,12 +129,20 @@ class MULandACC(implicit val conf:Config) extends Module{
 
     val statereg = RegInit(MULandACCState.RUN)
 
+    // Debug counters
+    val beatcnt = RegInit(0.U(32.W))
+    val stallcnt = RegInit(0.U(32.W))
+    val itercnt = RegInit(0.U(16.W))
+    val hazardwire = accmem.io.wen && (accmem.io.raddr === accmem.io.waddr)
+
     switch(statereg){
         is(MULandACCState.RUN){
             // Avoid address collision caused by bubbles in HBM.
-            when(io.fifovalid && io.trgswinvalid && (~(accmem.io.wen && (accmem.io.raddr === accmem.io.waddr)))){
+            when(io.fifovalid && io.trgswinvalid && (~hazardwire)){
                 io.ready := true.B
                 wenwire := true.B
+                beatcnt := beatcnt + 1.U
+                stallcnt := 0.U
                 when(cyclereg=/=(conf.numcycle-1).U){
                     cyclereg := cyclereg + 1.U
                 }.otherwise{
@@ -146,16 +154,27 @@ class MULandACC(implicit val conf:Config) extends Module{
                         statereg := MULandACCState.OUT
                     }
                 }
+            }.otherwise{
+                stallcnt := stallcnt + 1.U
             }
         }
         is(MULandACCState.OUT){
             validwire := true.B
+            stallcnt := 0.U
             cyclereg := cyclereg + 1.U
             when(cyclereg===(2*conf.numcycle-1).U){
                     cyclereg := 0.U
                     statereg := MULandACCState.RUN
+                    itercnt := itercnt + 1.U
+                    printf(p"MULACC_ITER: iter=${itercnt} beats=${beatcnt}\n")
             }
         }
+    }
+
+    // Print stall condition every 5000 cycles of stall
+    when(stallcnt === 5000.U){
+        stallcnt := 0.U
+        printf(p"MULACC_STALL: iter=${itercnt} beats=${beatcnt} fifo=${io.fifovalid} trgsw=${io.trgswinvalid} hazard=${hazardwire} cycle=${cyclereg} digit=${digitreg} state=${statereg.asUInt}\n")
     }
 
     when(~io.enable){
@@ -246,7 +265,7 @@ class ExternalProductMiddle(implicit val conf:Config) extends Module{
 
         val accout = Output(UInt((2*conf.block*64).W))
 	})
-    val inttqueue = Module(new Queue(Vec(conf.chunk,Vec(conf.radix,UInt(64.W))), conf.cyclebit, useSyncReadMem = true))
+    val inttqueue = Module(new Queue(Vec(conf.chunk,Vec(conf.radix,UInt(64.W))), conf.inttqueuedepth, useSyncReadMem = true))
     inttqueue.io.enq.valid := ShiftRegister(io.axi4sin(0).TVALID,conf.interslr)
 	val tdatavec = Wire(Vec(conf.nttnumbus,UInt(conf.buswidth.W)))
 	for(i <- 0 until conf.nttnumbus){
@@ -275,11 +294,34 @@ class ExternalProductMiddle(implicit val conf:Config) extends Module{
     mulandacc.io.enable := true.B
 
     io.accout := mulandacc.io.debugout
-    
+
     mulandacc.io.readyin := io.axi4sout(0).TREADY
     for(i <- 0 until conf.nttnumbus){
         io.axi4sout(i).TVALID := ShiftRegister(mulandacc.io.valid,conf.interslr)
         io.axi4sout(i).TDATA := ShiftRegister(mulandacc.io.out((i+1)*conf.buswidth-1,i*conf.buswidth),conf.interslr)
+    }
+
+    // Debug: track queue overflow (enq valid but not ready = data dropped)
+    val queuedropcnt = RegInit(0.U(32.W))
+    val queueenqcnt = RegInit(0.U(32.W))
+    val queuedeqcnt = RegInit(0.U(32.W))
+    when(inttqueue.io.enq.valid && !inttqueue.io.enq.ready){
+        queuedropcnt := queuedropcnt + 1.U
+        when(queuedropcnt === 0.U){
+            printf(p"QUEUE_DROP_FIRST: enqcnt=${queueenqcnt} deqcnt=${queuedeqcnt}\n")
+        }
+    }
+    when(inttqueue.io.enq.fire){
+        queueenqcnt := queueenqcnt + 1.U
+    }
+    when(inttqueue.io.deq.fire){
+        queuedeqcnt := queuedeqcnt + 1.U
+    }
+    // Periodic queue status
+    val queuestatcnt = RegInit(0.U(32.W))
+    queuestatcnt := queuestatcnt + 1.U
+    when(queuestatcnt === 0.U){
+        printf(p"QUEUE_STAT: enq=${queueenqcnt} deq=${queuedeqcnt} drop=${queuedropcnt} enqV=${inttqueue.io.enq.valid} enqR=${inttqueue.io.enq.ready} deqV=${inttqueue.io.deq.valid} deqR=${inttqueue.io.deq.ready}\n")
     }
 }
 

@@ -27,10 +27,27 @@ class SampleExtractIndex(index : Int, implicit val conf:Config) extends Module{
 		wordwire(i) := io.in((i+1)*conf.Qbit-1,i*conf.Qbit)
 	}
 
+	// Debug: one-shot print on state transitions
+	val seibeats = RegInit(0.U(16.W))
+	when(io.axi4sout.TVALID && io.axi4sout.TREADY){
+		seibeats := seibeats + 1.U
+	}
+	val seistallcnt = RegInit(0.U(32.W))
+	when(io.axi4sout.TVALID && !io.axi4sout.TREADY){
+		seistallcnt := seistallcnt + 1.U
+		when(seistallcnt === 5000.U){
+			seistallcnt := 0.U
+			printf(p"SEI_STALL: state=${statereg.asUInt} beats=${seibeats} cnt=${cntreg} TVALID=${io.axi4sout.TVALID} TREADY=${io.axi4sout.TREADY}\n")
+		}
+	}.otherwise{
+		seistallcnt := 0.U
+	}
+
 	switch(statereg){
 		is(SampleExtractIndexState.WAIT){
 			when(io.enable){
 				statereg := SampleExtractIndexState.POSITIVE
+				printf(p"SEI_START: enable=${io.enable}\n")
 			}
 		}
 		is(SampleExtractIndexState.POSITIVE){
@@ -65,6 +82,7 @@ class SampleExtractIndex(index : Int, implicit val conf:Config) extends Module{
 			io.axi4sout.TVALID := true.B
 			when(io.axi4sout.TREADY){
 				statereg := SampleExtractIndexState.FIN
+				printf(p"SEI_FIN: beats=${seibeats + 1.U}\n")
 			}
 		}
 	}
