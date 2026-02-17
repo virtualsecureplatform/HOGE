@@ -26,7 +26,7 @@ case class Config() {
     val totaliksknumbus = 40
     val iksknumsegments = totaliksknumbus/iksknumbus
 
-    val axi4snumslice = 10
+    val axi4snumslice = 14
     val cyclebit = 5
     val nttnumbus = 1<<(Nbit-cyclebit+6-9)
     val trlwenumbus = 1<<(Nbit-cyclebit+5-9)
