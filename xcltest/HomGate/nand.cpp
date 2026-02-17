@@ -190,13 +190,14 @@ int main(int argc, char* argv[]) {
 			OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_ina,buffer_inb}, 0 /* 0 means from host*/));
 			q.finish();
 
-			std::cout<<"START"<<std::endl;
+			std::cout<<"START gate "<<test<<std::endl;
+			std::cout.flush();
 			auto kernel_start = std::chrono::high_resolution_clock::now();
 			OCL_CHECK(err, err = q.enqueueTask(kernel_bootstrapping));
 			// Copy Result from Device Global Memory to Host Local Memory
 			q.finish();
 			auto kernel_end = std::chrono::high_resolution_clock::now();
-			std::cout<<"END"<<std::endl;
+			std::cout<<"END gate "<<test<<std::endl;
 
 			OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_res}, CL_MIGRATE_MEM_OBJECT_HOST));
 			q.finish();
@@ -204,7 +205,7 @@ int main(int argc, char* argv[]) {
 			kernel_time = std::chrono::duration<double>(kernel_end - kernel_start);
 
 			kernel_time_in_sec = kernel_time.count();
-			std::cout<<kernel_time_in_sec<<std::endl;
+			std::cout<<"Gate "<<test<<" kernel time: "<<kernel_time_in_sec*1000.0<<" ms"<<std::endl;
 			for(int i = 0; i <= TFHEpp::lvl1param::n; i++){
 				if(kernelres[i] != res[i]){
 					std::cout<<"ERROR: "<<i<<" : "<<kernelres[i]<<" : "<<res[i]<<std::endl;

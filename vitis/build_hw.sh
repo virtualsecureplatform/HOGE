@@ -13,7 +13,7 @@
 #   ./vitis/build_hw.sh --test       # Build xclbin and run nand test on real FPGA
 #   ./vitis/build_hw.sh --clean      # Clean all build artifacts and rebuild
 #
-set -e
+set -eo pipefail
 
 # Parse arguments
 RUN_TEST=false

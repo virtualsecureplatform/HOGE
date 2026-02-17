@@ -14,7 +14,7 @@
 #   ./vitis/build_hw_emu.sh --test       # Build xclbin and run hw_emu test
 #   ./vitis/build_hw_emu.sh --clean      # Clean all build artifacts and rebuild
 #
-set -e
+set -eo pipefail
 
 # Parse arguments
 RUN_TEST=false
