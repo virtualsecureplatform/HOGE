@@ -88,9 +88,6 @@ class HomGateTop(implicit val conf:Config) extends Module{
 		val ap_idle = Output(Bool())
 		val ap_ready = Output(Bool())
 
-		val dbg_state = Output(UInt(2.W))
-		val dbg_countreg = Output(UInt(6.W))
-		val dbg_cmdsent = Output(UInt(21.W))
 	})
 
 	io.ap_done := false.B
@@ -193,9 +190,6 @@ class HomGateTop(implicit val conf:Config) extends Module{
 		}
 	}
 
-	io.dbg_state := statereg.asUInt
-	io.dbg_countreg := countreg
-	io.dbg_cmdsent := Cat(Cat(bkincmdreg), Cat(ikskincmdreg), inbcmdreg, inacmdreg, outcmdreg)
 }
 
 
@@ -240,9 +234,6 @@ class HomGateWrap(implicit val conf:Config) extends Module{
 		val debugvalid = Output(Bool())
 		val debug_iksenable = Output(Bool())
 
-		val dbg_state = Output(UInt(2.W))
-		val dbg_countreg = Output(UInt(6.W))
-		val dbg_cmdsent = Output(UInt(21.W))
 	})
 
 	val homnand = Module(new HomGateTop)
@@ -278,10 +269,6 @@ class HomGateWrap(implicit val conf:Config) extends Module{
 	homnand.io.ikskaddr := io.ikskaddr
 	homnand.io.bkaddr := io.bkaddr
 	homnand.io.brvalid := globaloutsliceSLR1toSLR0.io.manager.TVALID
-
-	io.dbg_state := homnand.io.dbg_state
-	io.dbg_countreg := homnand.io.dbg_countreg
-	io.dbg_cmdsent := homnand.io.dbg_cmdsent
 
 	tlweadd.io.scaleaindex := io.scaleaindex
 	tlweadd.io.scalebindex := io.scalebindex

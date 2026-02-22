@@ -215,14 +215,6 @@ class AXISBRMiddle(implicit val conf:Config) extends Module{
 		val axi4sin = Vec(conf.nttnumbus,new AXI4StreamSubordinate(conf.buswidth))
 		val axi4sout = Vec(conf.nttnumbus,new AXI4StreamManager(conf.buswidth))
 
-		// Debug probes
-		val dbg_fifovalid = Output(Bool())
-		val dbg_hazard = Output(Bool())
-		val dbg_mulacc_state = Output(UInt(1.W))
-		val dbg_itercnt = Output(UInt(16.W))
-		val dbg_queuedrop = Output(UInt(32.W))
-		val dbg_enq_valid = Output(Bool())
-		val dbg_enq_ready = Output(Bool())
 	})
 
 	val extpmiddle = Module(new ExternalProductMiddle)
@@ -241,54 +233,6 @@ class AXISBRMiddle(implicit val conf:Config) extends Module{
 	extpmiddle.io.trgswinvalid := Cat(tvalidvec).andR
 	extpmiddle.io.trgswin := Cat(tdatavec.reverse)
 
-	// Debug: per-channel BK beat counters (counts beats received from v++ FIFO, before register slices)
-	val bkbeattotal = RegInit(0.U(32.W))
-	val bkbeatvec = for(i <- 0 until conf.bknumbus) yield {
-		val cnt = RegInit(0.U(32.W))
-		when(io.axi4bkin(i).TVALID && io.axi4bkin(i).TREADY){
-			cnt := cnt + 1.U
-		}
-		cnt
-	}
-	when(io.axi4bkin(0).TVALID && io.axi4bkin(0).TREADY){
-		bkbeattotal := bkbeattotal + 1.U
-	}
-
-	// Debug: print BK channel stall periodically
-	val bkstallcnt = RegInit(0.U(32.W))
-	when(extpmiddle.io.trgswinready){
-		bkstallcnt := 0.U
-	}.otherwise{
-		bkstallcnt := bkstallcnt + 1.U
-	}
-	when(bkstallcnt === 5000.U){
-		bkstallcnt := 0.U
-		printf(p"BK_STALL: validvec=${Cat(tvalidvec)} andR=${Cat(tvalidvec).andR} ready=${extpmiddle.io.trgswinready} ch0=${bkbeatvec(0)} ch7=${bkbeatvec(7)} total=${bkbeattotal}\n")
-		// Print per-channel TVALID and TREADY at the register slice input
-		val inputValidVec = Wire(Vec(conf.bknumbus, Bool()))
-		val inputReadyVec = Wire(Vec(conf.bknumbus, Bool()))
-		for(i <- 0 until conf.bknumbus){
-			inputValidVec(i) := io.axi4bkin(i).TVALID
-			inputReadyVec(i) := io.axi4bkin(i).TREADY
-		}
-		printf(p"BK_INPUT: validIn=${Cat(inputValidVec)} readyIn=${Cat(inputReadyVec)}\n")
-	}
-
-	// Connect debug outputs
-	io.dbg_fifovalid := extpmiddle.io.dbg_fifovalid
-	io.dbg_hazard := extpmiddle.io.dbg_hazard
-	io.dbg_mulacc_state := extpmiddle.io.dbg_mulacc_state
-	io.dbg_itercnt := extpmiddle.io.dbg_itercnt
-	io.dbg_queuedrop := extpmiddle.io.dbg_queuedrop
-	io.dbg_enq_valid := extpmiddle.io.dbg_enq_valid
-	io.dbg_enq_ready := extpmiddle.io.dbg_enq_ready
-	dontTouch(io.dbg_fifovalid)
-	dontTouch(io.dbg_hazard)
-	dontTouch(io.dbg_mulacc_state)
-	dontTouch(io.dbg_itercnt)
-	dontTouch(io.dbg_queuedrop)
-	dontTouch(io.dbg_enq_valid)
-	dontTouch(io.dbg_enq_ready)
 }
 
 class AXISBRLater(implicit val conf:Config) extends Module{

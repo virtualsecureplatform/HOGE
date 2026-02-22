@@ -268,24 +268,7 @@ module BRBack #(
     .io_axi4sout_1_TDATA    (middle_out_1_TDATA),
     .io_axi4sout_2_TDATA    (middle_out_2_TDATA),
     .io_axi4sout_3_TDATA    (middle_out_3_TDATA),
-    // Debug probes
-    .io_dbg_fifovalid       (dbg_fifovalid),
-    .io_dbg_hazard          (dbg_hazard),
-    .io_dbg_mulacc_state    (dbg_mulacc_state),
-    .io_dbg_itercnt         (dbg_itercnt),
-    .io_dbg_queuedrop       (dbg_queuedrop),
-    .io_dbg_enq_valid       (dbg_enq_valid),
-    .io_dbg_enq_ready       (dbg_enq_ready)
   );
-
-  // Debug probe wires
-  wire        dbg_fifovalid;
-  wire        dbg_hazard;
-  wire        dbg_mulacc_state;
-  wire [15:0] dbg_itercnt;
-  wire [31:0] dbg_queuedrop;
-  wire        dbg_enq_valid;
-  wire        dbg_enq_ready;
 
   // --------------------------------------------------------------------------
   // AXISBRLater (AXISBRMiddle output -> axis04-05)
@@ -350,79 +333,9 @@ module BRBack #(
   assign axis16_tkeep = {4{1'b1}};
   assign axis16_tlast = 1'b0;
 
-// Debug: globalout path monitoring (axis17 → GlobalOutslice → axis16)
-reg [31:0] dbg_gout_ax17_beats;
-reg [31:0] dbg_gout_ax16_beats;
-reg        dbg_gout_seen;
-always @(posedge ap_clk) begin
-    if (!ap_rst_n) begin
-        dbg_gout_ax17_beats <= 0;
-        dbg_gout_ax16_beats <= 0;
-        dbg_gout_seen <= 0;
-    end else begin
-        if (axis17_tvalid & axis17_tready)
-            dbg_gout_ax17_beats <= dbg_gout_ax17_beats + 1;
-        if (axis16_tvalid & axis16_tready)
-            dbg_gout_ax16_beats <= dbg_gout_ax16_beats + 1;
-        if (axis17_tvalid & !dbg_gout_seen) begin
-            dbg_gout_seen <= 1;
-        end
-    end
-end
-
-// =========================================================================
-// Debug axis18: Internal probes → 32-bit stream to HomGate
-// =========================================================================
-// Bit layout (Build 16):
-//   [0]     dbg_fifovalid       — INTT queue has data (deq.valid)
-//   [1]     dbg_hazard          — MULandACC address hazard active
-//   [2]     dbg_mulacc_state    — MULandACC state: 0=RUN, 1=OUT
-//   [3]     dbg_enq_valid       — INTT queue enq valid (data arriving)
-//   [4]     dbg_enq_ready       — INTT queue enq ready (not full)
-//   [5]     ntt_pipe_in_ever    — INTT data ever reached AXISBRMiddle
-//   [6]     middle_out_ever     — MULandACC ever produced output
-//   [7]     axis17_in_ever      — GlobalOut ever received from BRFront
-//   [15:8]  dbg_queuedrop[7:0]  — INTT queue overflow count (sat 8-bit)
-//   [31:16] dbg_itercnt         — MULandACC iteration count (16-bit)
-
-reg        dbg_ntt_pipe_in_ever;
-reg        dbg_middle_out_ever;
-reg        dbg_axis17_in_ever;
-
-always @(posedge ap_clk) begin
-    if (!ap_rst_n) begin
-        dbg_ntt_pipe_in_ever  <= 0;
-        dbg_middle_out_ever   <= 0;
-        dbg_axis17_in_ever    <= 0;
-    end else begin
-        if (ntt_pipe_out_0_TVALID)  dbg_ntt_pipe_in_ever  <= 1;
-        if (middle_out_0_TVALID)    dbg_middle_out_ever   <= 1;
-        if (axis17_tvalid)          dbg_axis17_in_ever    <= 1;
-    end
-end
-
-// Saturate queuedrop to 8 bits for packing
-wire [7:0] dbg_queuedrop_sat = (dbg_queuedrop[31:8] != 0) ? 8'hFF : dbg_queuedrop[7:0];
-
-wire [31:0] brback_debug_word = {
-    dbg_itercnt,
-    dbg_queuedrop_sat,
-    dbg_axis17_in_ever, dbg_middle_out_ever, dbg_ntt_pipe_in_ever,
-    dbg_enq_ready, dbg_enq_valid,
-    dbg_mulacc_state, dbg_hazard, dbg_fifovalid
-};
-
-// 8-stage register pipeline for timing (SLR1 internal)
-reg [31:0] dbg_pipe [0:7];
-integer dbg_i;
-always @(posedge ap_clk) begin
-    dbg_pipe[0] <= brback_debug_word;
-    for (dbg_i = 1; dbg_i < 8; dbg_i = dbg_i + 1)
-        dbg_pipe[dbg_i] <= dbg_pipe[dbg_i-1];
-end
-
-assign axis18_tvalid = 1'b1;
-assign axis18_tdata  = dbg_pipe[7];
+// axis18: unused debug stream — tie off
+assign axis18_tvalid = 1'b0;
+assign axis18_tdata  = 32'b0;
 assign axis18_tkeep  = {4{1'b1}};
 assign axis18_tlast  = 1'b0;
 
