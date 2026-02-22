@@ -87,6 +87,10 @@ class HomGateTop(implicit val conf:Config) extends Module{
 		val ap_done = Output(Bool())
 		val ap_idle = Output(Bool())
 		val ap_ready = Output(Bool())
+
+		val dbg_state = Output(UInt(2.W))
+		val dbg_countreg = Output(UInt(6.W))
+		val dbg_cmdsent = Output(UInt(21.W))
 	})
 
 	io.ap_done := false.B
@@ -118,7 +122,7 @@ class HomGateTop(implicit val conf:Config) extends Module{
 	val ikskincmdreg = RegInit(VecInit(Seq.fill(conf.iksknumbus)(0.U(1.W))))
 	val bkincmdreg = RegInit(VecInit(Seq.fill(conf.bknumbus)(0.U(1.W))))
 
-	val countreg = RegInit(0.U(3.W))
+	val countreg = RegInit(0.U(6.W))
 
 	switch(statereg){
 		is(HomGateState.WAIT){
@@ -128,9 +132,11 @@ class HomGateTop(implicit val conf:Config) extends Module{
 			io.ap_idle := ~io.ap_start
 		}
 		is(HomGateState.RESET){
-			// DataMover needs at least 3 cycles to reset
+			// PG022: DataMover needs 16+ cycles after reset deassertion before first command
+			// Phase 1 (cycles 0-7): active reset (user_rst=1, aresetn=0)
+			// Phase 2 (cycles 8-31): post-reset settling (user_rst=0, aresetn=1)
 			io.ap_idle := false.B
-			io.user_rst := true.B
+			io.user_rst := countreg < 8.U
 			outcmdreg := false.B
 			inacmdreg := false.B
 			inbcmdreg := false.B
@@ -140,7 +146,7 @@ class HomGateTop(implicit val conf:Config) extends Module{
 			for(i <- 0 until conf.bknumbus){
 				bkincmdreg(i) := false.B
 			}
-			when(countreg=/=7.U){
+			when(countreg=/=31.U){
 				countreg := countreg + 1.U
 			}.otherwise{
 				statereg := HomGateState.INIT
@@ -186,6 +192,10 @@ class HomGateTop(implicit val conf:Config) extends Module{
 			}
 		}
 	}
+
+	io.dbg_state := statereg.asUInt
+	io.dbg_countreg := countreg
+	io.dbg_cmdsent := Cat(Cat(bkincmdreg), Cat(ikskincmdreg), inbcmdreg, inacmdreg, outcmdreg)
 }
 
 
@@ -221,12 +231,18 @@ class HomGateWrap(implicit val conf:Config) extends Module{
 
 		val user_rst = Output(Bool())
 
+		val s2mm_tlast = Output(Bool())
+
 		val ikskout = Output(UInt(conf.buswidth.W))
 		val ikskvalid = Output(Bool())
 		val debugadd = Output(UInt(conf.buswidth.W))
 		val debugout = Output(UInt((conf.block*conf.Qbit).W))
 		val debugvalid = Output(Bool())
 		val debug_iksenable = Output(Bool())
+
+		val dbg_state = Output(UInt(2.W))
+		val dbg_countreg = Output(UInt(6.W))
+		val dbg_cmdsent = Output(UInt(21.W))
 	})
 
 	val homnand = Module(new HomGateTop)
@@ -263,6 +279,10 @@ class HomGateWrap(implicit val conf:Config) extends Module{
 	homnand.io.bkaddr := io.bkaddr
 	homnand.io.brvalid := globaloutsliceSLR1toSLR0.io.manager.TVALID
 
+	io.dbg_state := homnand.io.dbg_state
+	io.dbg_countreg := homnand.io.dbg_countreg
+	io.dbg_cmdsent := homnand.io.dbg_cmdsent
+
 	tlweadd.io.scaleaindex := io.scaleaindex
 	tlweadd.io.scalebindex := io.scalebindex
 	tlweadd.io.offsetindex := io.offsetindex
@@ -280,7 +300,12 @@ class HomGateWrap(implicit val conf:Config) extends Module{
 
 	axisbrformer.io.axi4sglobalout <> globaloutsliceSLR2toSLR1.io.subordinate
 	globaloutsliceSLR2toSLR1.io.manager <> globaloutsliceSLR1toSLR0.io.subordinate
-	globaloutsliceSLR1toSLR0.io.manager <> io.axi4out 
+	val s2mmtlast = Module(new S2MMTlastCounter)
+	s2mmtlast.io.subordinate <> globaloutsliceSLR1toSLR0.io.manager
+	io.axi4out.TVALID := s2mmtlast.io.manager.TVALID
+	io.axi4out.TDATA := s2mmtlast.io.manager.TDATA
+	s2mmtlast.io.manager.TREADY := io.axi4out.TREADY
+	io.s2mm_tlast := s2mmtlast.io.tlast
 
 	for(i <- 0 until conf.nttnumbus){
 		nttSLR1toSLR0slices(i).io.subordinate <> axisbrformer.io.axi4sout(i)

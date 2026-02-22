@@ -214,6 +214,15 @@ class AXISBRMiddle(implicit val conf:Config) extends Module{
 
 		val axi4sin = Vec(conf.nttnumbus,new AXI4StreamSubordinate(conf.buswidth))
 		val axi4sout = Vec(conf.nttnumbus,new AXI4StreamManager(conf.buswidth))
+
+		// Debug probes
+		val dbg_fifovalid = Output(Bool())
+		val dbg_hazard = Output(Bool())
+		val dbg_mulacc_state = Output(UInt(1.W))
+		val dbg_itercnt = Output(UInt(16.W))
+		val dbg_queuedrop = Output(UInt(32.W))
+		val dbg_enq_valid = Output(Bool())
+		val dbg_enq_ready = Output(Bool())
 	})
 
 	val extpmiddle = Module(new ExternalProductMiddle)
@@ -264,6 +273,22 @@ class AXISBRMiddle(implicit val conf:Config) extends Module{
 		}
 		printf(p"BK_INPUT: validIn=${Cat(inputValidVec)} readyIn=${Cat(inputReadyVec)}\n")
 	}
+
+	// Connect debug outputs
+	io.dbg_fifovalid := extpmiddle.io.dbg_fifovalid
+	io.dbg_hazard := extpmiddle.io.dbg_hazard
+	io.dbg_mulacc_state := extpmiddle.io.dbg_mulacc_state
+	io.dbg_itercnt := extpmiddle.io.dbg_itercnt
+	io.dbg_queuedrop := extpmiddle.io.dbg_queuedrop
+	io.dbg_enq_valid := extpmiddle.io.dbg_enq_valid
+	io.dbg_enq_ready := extpmiddle.io.dbg_enq_ready
+	dontTouch(io.dbg_fifovalid)
+	dontTouch(io.dbg_hazard)
+	dontTouch(io.dbg_mulacc_state)
+	dontTouch(io.dbg_itercnt)
+	dontTouch(io.dbg_queuedrop)
+	dontTouch(io.dbg_enq_valid)
+	dontTouch(io.dbg_enq_ready)
 }
 
 class AXISBRLater(implicit val conf:Config) extends Module{

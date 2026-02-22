@@ -93,6 +93,13 @@ class MULandACC(implicit val conf:Config) extends Module{
         val readyin = Input(Bool())
         
         val debugout = Output(UInt((2*conf.block*64).W))
+
+        // Debug probes for hw debugging
+        val dbg_state = Output(UInt(1.W))
+        val dbg_hazard = Output(Bool())
+        val dbg_itercnt = Output(UInt(16.W))
+        val dbg_digitreg = Output(UInt(log2Ceil(2*conf.l).W))
+        val dbg_cyclereg = Output(UInt((conf.cyclebit+1).W))
 	})
     io.ready := false.B
 
@@ -182,6 +189,18 @@ class MULandACC(implicit val conf:Config) extends Module{
         cyclereg := 0.U
         digitreg := 0.U
     }
+
+    // Connect debug outputs
+    io.dbg_state := statereg.asUInt
+    io.dbg_hazard := hazardwire
+    io.dbg_itercnt := itercnt
+    io.dbg_digitreg := digitreg
+    io.dbg_cyclereg := cyclereg
+    dontTouch(io.dbg_state)
+    dontTouch(io.dbg_hazard)
+    dontTouch(io.dbg_itercnt)
+    dontTouch(io.dbg_digitreg)
+    dontTouch(io.dbg_cyclereg)
 }
 
 class ExternalProductFormer(implicit val conf:Config) extends Module{
@@ -264,6 +283,15 @@ class ExternalProductMiddle(implicit val conf:Config) extends Module{
         val trgswinready = Output(Bool())
 
         val accout = Output(UInt((2*conf.block*64).W))
+
+        // Debug probes
+        val dbg_fifovalid = Output(Bool())
+        val dbg_hazard = Output(Bool())
+        val dbg_mulacc_state = Output(UInt(1.W))
+        val dbg_itercnt = Output(UInt(16.W))
+        val dbg_queuedrop = Output(UInt(32.W))
+        val dbg_enq_valid = Output(Bool())
+        val dbg_enq_ready = Output(Bool())
 	})
     val inttqueue = Module(new Queue(Vec(conf.chunk,Vec(conf.radix,UInt(64.W))), conf.inttqueuedepth, useSyncReadMem = true))
     inttqueue.io.enq.valid := ShiftRegister(io.axi4sin(0).TVALID,conf.interslr)
@@ -323,6 +351,22 @@ class ExternalProductMiddle(implicit val conf:Config) extends Module{
     when(queuestatcnt === 0.U){
         printf(p"QUEUE_STAT: enq=${queueenqcnt} deq=${queuedeqcnt} drop=${queuedropcnt} enqV=${inttqueue.io.enq.valid} enqR=${inttqueue.io.enq.ready} deqV=${inttqueue.io.deq.valid} deqR=${inttqueue.io.deq.ready}\n")
     }
+
+    // Connect debug outputs
+    io.dbg_fifovalid := inttqueue.io.deq.valid
+    io.dbg_hazard := mulandacc.io.dbg_hazard
+    io.dbg_mulacc_state := mulandacc.io.dbg_state
+    io.dbg_itercnt := mulandacc.io.dbg_itercnt
+    io.dbg_queuedrop := queuedropcnt
+    io.dbg_enq_valid := inttqueue.io.enq.valid
+    io.dbg_enq_ready := inttqueue.io.enq.ready
+    dontTouch(io.dbg_fifovalid)
+    dontTouch(io.dbg_hazard)
+    dontTouch(io.dbg_mulacc_state)
+    dontTouch(io.dbg_itercnt)
+    dontTouch(io.dbg_queuedrop)
+    dontTouch(io.dbg_enq_valid)
+    dontTouch(io.dbg_enq_ready)
 }
 
 class ExternalProductLater(implicit val conf:Config) extends Module{

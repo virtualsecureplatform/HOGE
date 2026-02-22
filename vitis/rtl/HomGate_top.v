@@ -58,7 +58,8 @@ module HomGate #(
   parameter integer C_AXIS06_TDATA_WIDTH       = 512,
   parameter integer C_AXIS07_TDATA_WIDTH       = 512,
   parameter integer C_AXIS08_TDATA_WIDTH       = 512,
-  parameter integer C_AXIS09_TDATA_WIDTH       = 512
+  parameter integer C_AXIS09_TDATA_WIDTH       = 512,
+  parameter integer C_AXIS10_TDATA_WIDTH       = 32
 )
 (
   // System Signals
@@ -544,6 +545,12 @@ module HomGate #(
   output wire [C_AXIS09_TDATA_WIDTH-1:0]         axis09_tdata         ,
   output wire [C_AXIS09_TDATA_WIDTH/8-1:0]       axis09_tkeep         ,
   output wire                                    axis09_tlast         ,
+  // AXI4-Stream (slave) interface axis10 — BRBack debug stream
+  input  wire                                    axis10_tvalid        ,
+  output wire                                    axis10_tready        ,
+  input  wire [C_AXIS10_TDATA_WIDTH-1:0]         axis10_tdata         ,
+  input  wire [C_AXIS10_TDATA_WIDTH/8-1:0]       axis10_tkeep         ,
+  input  wire                                    axis10_tlast         ,
   // AXI4-Lite slave interface
   input  wire                                    s_axi_control_awvalid,
   output wire                                    s_axi_control_awready,
@@ -666,7 +673,12 @@ inst_control_s_axi (
   .axi17_ptr0   ( axi17_ptr0            ),
   .axi18_ptr0   ( axi18_ptr0            ),
   .axi19_ptr0   ( axi19_ptr0            ),
-  .axi20_ptr0   ( axi20_ptr0            )
+  .axi20_ptr0   ( axi20_ptr0            ),
+  .dbg_status0  ( dbg_status0           ),
+  .dbg_status1  ( dbg_status1           ),
+  .dbg_status2  ( dbg_status2           ),
+  .dbg_status3  ( dbg_status3           ),
+  .dbg_status4  ( dbg_status4           )
 );
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -707,22 +719,32 @@ wire axi4inbcmd_TVALID;
 wire axi4inbcmd_TREADY;
 wire [103:0] axi4inbcmd_TDATA;
 
-// GlobalOut (S2MM data) wires
+// GlobalOut (S2MM data) wires - after S2MMTlastCounter
 wire axi4sout_TVALID;
 wire axi4sout_TREADY;
 wire [31:0] axi4sout_TDATA;
+wire axi4sout_TLAST;
 
+// GlobalOut pre-TLAST wires (between GlobalOutslice and S2MMTlastCounter)
+wire gout_pre_TVALID;
+wire gout_pre_TREADY;
+wire [31:0] gout_pre_TDATA;
+
+
+// S2MM DataMover status wires (for ILA)
+wire dm00_s2mm_err;
+wire dm00_s2mm_sts_tvalid;
 
 axi_datamover_0 datamover00 (
   .m_axi_s2mm_aclk(ap_clk),
   .m_axi_s2mm_aresetn(ap_rst_n&user_rst_n),
-  .s2mm_err(),
+  .s2mm_err(dm00_s2mm_err),
   .m_axis_s2mm_cmdsts_awclk(ap_clk),
   .m_axis_s2mm_cmdsts_aresetn(ap_rst_n&user_rst_n),
   .s_axis_s2mm_cmd_tvalid(axi4outcmd_TVALID),
   .s_axis_s2mm_cmd_tready(axi4outcmd_TREADY),
   .s_axis_s2mm_cmd_tdata(axi4outcmd_TDATA),
-  .m_axis_s2mm_sts_tvalid(),
+  .m_axis_s2mm_sts_tvalid(dm00_s2mm_sts_tvalid),
   .m_axis_s2mm_sts_tready(1'b1),
   .m_axis_s2mm_sts_tdata(),
   .m_axis_s2mm_sts_tkeep(),
@@ -747,21 +769,25 @@ axi_datamover_0 datamover00 (
   .m_axi_s2mm_bready(m00_axi_bready),
   .s_axis_s2mm_tdata(axi4sout_TDATA),
   .s_axis_s2mm_tkeep(4'hF),
-  .s_axis_s2mm_tlast(1'b0),
+  .s_axis_s2mm_tlast(axi4sout_TLAST),
   .s_axis_s2mm_tvalid(axi4sout_TVALID),
   .s_axis_s2mm_tready(axi4sout_TREADY)
 );
 
+// MM2S CT_A DataMover status wires (for ILA)
+wire dm01_mm2s_err;
+wire dm01_mm2s_sts_tvalid;
+
 axi_datamover_1 datamover01 (
   .m_axi_mm2s_aclk(ap_clk),
   .m_axi_mm2s_aresetn(ap_rst_n&user_rst_n),
-  .mm2s_err(),
+  .mm2s_err(dm01_mm2s_err),
   .m_axis_mm2s_cmdsts_aclk(ap_clk),
   .m_axis_mm2s_cmdsts_aresetn(ap_rst_n&user_rst_n),
   .s_axis_mm2s_cmd_tvalid(axi4inacmd_TVALID),
   .s_axis_mm2s_cmd_tready(axi4inacmd_TREADY),
   .s_axis_mm2s_cmd_tdata(axi4inacmd_TDATA),
-  .m_axis_mm2s_sts_tvalid(),
+  .m_axis_mm2s_sts_tvalid(dm01_mm2s_sts_tvalid),
   .m_axis_mm2s_sts_tready(1'b1),
   .m_axis_mm2s_sts_tdata(),
   .m_axis_mm2s_sts_tkeep(),
@@ -832,16 +858,20 @@ wire axi4ikskincmd_0_TVALID;
 wire axi4ikskincmd_0_TREADY;
 wire [103:0] axi4ikskincmd_0_TDATA;
 
+// MM2S IKSK[0] DataMover status wires (for ILA)
+wire dm03_mm2s_err;
+wire dm03_mm2s_sts_tvalid;
+
 axi_datamover_1 datamover03 (
   .m_axi_mm2s_aclk(ap_clk),
   .m_axi_mm2s_aresetn(ap_rst_n&user_rst_n),
-  .mm2s_err(),
+  .mm2s_err(dm03_mm2s_err),
   .m_axis_mm2s_cmdsts_aclk(ap_clk),
   .m_axis_mm2s_cmdsts_aresetn(ap_rst_n&user_rst_n),
   .s_axis_mm2s_cmd_tvalid(axi4ikskincmd_0_TVALID),
   .s_axis_mm2s_cmd_tready(axi4ikskincmd_0_TREADY),
   .s_axis_mm2s_cmd_tdata(axi4ikskincmd_0_TDATA),
-  .m_axis_mm2s_sts_tvalid(),
+  .m_axis_mm2s_sts_tvalid(dm03_mm2s_sts_tvalid),
   .m_axis_mm2s_sts_tready(1'b1),
   .m_axis_mm2s_sts_tdata(),
   .m_axis_mm2s_sts_tkeep(),
@@ -1734,8 +1764,181 @@ HomGateTop homgate(
   .io_ap_start(ap_start),
   .io_ap_done(ap_done),
   .io_ap_idle(ap_idle),
-  .io_ap_ready(ap_ready)
+  .io_ap_ready(ap_ready),
+  .io_dbg_state(dbg_state),
+  .io_dbg_countreg(dbg_countreg),
+  .io_dbg_cmdsent(dbg_cmdsent)
 );
+
+// ILA debug wires
+wire [1:0] dbg_state;
+wire [5:0] dbg_countreg;
+wire [20:0] dbg_cmdsent;
+
+// Debug status registers readable from host via AXI control (offset 0x200, 0x204)
+// dbg_status0[20:0]  = cmdsent flags (bk[8]|iksk[10]|inb|ina|out)
+// dbg_status0[23:21] = DM sts_tvalid (S2MM, CT, IKSK0)
+// dbg_status0[26:24] = DM errors (S2MM, CT, IKSK0)
+// dbg_status0[31:27] = reserved
+wire [31:0] dbg_status0 = {5'b0, dm00_s2mm_err, dm01_mm2s_err, dm03_mm2s_err,
+                           dm00_s2mm_sts_tvalid, dm01_mm2s_sts_tvalid, dm03_mm2s_sts_tvalid,
+                           dbg_cmdsent};
+
+// dbg_status1[1:0]   = FSM state (WAIT=0, INIT=1, RUN=2, RESET=3)
+// dbg_status1[7:2]   = countreg
+// dbg_status1[8]     = areset
+// dbg_status1[9]     = user_rst_n
+// dbg_status1[10]    = user_rst
+// dbg_status1[11]    = ap_idle
+// dbg_status1[12]    = ap_done
+// dbg_status1[13]    = ap_start
+// dbg_status1[14]    = axi4inbcmd_TREADY
+// dbg_status1[15]    = axi4inbcmd_TVALID
+// dbg_status1[16]    = axi4inacmd_TREADY
+// dbg_status1[17]    = axi4inacmd_TVALID
+// dbg_status1[18]    = axi4outcmd_TREADY
+// dbg_status1[19]    = axi4outcmd_TVALID
+// dbg_status1[20]    = axis01_tready
+// dbg_status1[21]    = axis01_tvalid
+// dbg_status1[22]    = axi4sout_TREADY
+// dbg_status1[23]    = axi4sout_TVALID
+// dbg_status1[24]    = datamover13_mm2s_sts_tvalid
+// dbg_status1[25]    = datamover13_mm2s_err
+// dbg_status1[31:26] = reserved
+wire [31:0] dbg_status1 = {6'b0, datamover13_mm2s_err, datamover13_mm2s_sts_tvalid,
+                           axi4sout_TVALID, axi4sout_TREADY, axis01_tvalid, axis01_tready,
+                           axi4outcmd_TVALID, axi4outcmd_TREADY, axi4inacmd_TVALID, axi4inacmd_TREADY,
+                           axi4inbcmd_TVALID, axi4inbcmd_TREADY,
+                           ap_start, ap_done, ap_idle, user_rst, user_rst_n, areset,
+                           dbg_countreg, dbg_state};
+
+// dbg_status2: HBM AXI read channels (CT, IKSK0, BK0) + S2MM write channel
+// dbg_status2[0]  = m01_axi_arvalid  (CT MM2S read addr)
+// dbg_status2[1]  = m01_axi_arready
+// dbg_status2[2]  = m01_axi_rvalid   (CT MM2S read data)
+// dbg_status2[3]  = m01_axi_rready
+// dbg_status2[4]  = m03_axi_arvalid  (IKSK0 MM2S read addr)
+// dbg_status2[5]  = m03_axi_arready
+// dbg_status2[6]  = m03_axi_rvalid   (IKSK0 MM2S read data)
+// dbg_status2[7]  = m03_axi_rready
+// dbg_status2[8]  = m13_axi_arvalid  (BK0 MM2S read addr)
+// dbg_status2[9]  = m13_axi_arready
+// dbg_status2[10] = m13_axi_rvalid   (BK0 MM2S read data)
+// dbg_status2[11] = m13_axi_rready
+// dbg_status2[12] = m00_axi_awvalid  (S2MM write addr)
+// dbg_status2[13] = m00_axi_awready
+// dbg_status2[14] = m00_axi_wvalid   (S2MM write data)
+// dbg_status2[15] = m00_axi_wready
+// dbg_status2[16] = m00_axi_bvalid   (S2MM write response)
+// dbg_status2[17] = m00_axi_bready
+// dbg_status2[18] = m02_axi_arvalid  (IKSK key read addr - inb)
+// dbg_status2[19] = m02_axi_arready
+// dbg_status2[20] = m02_axi_rvalid   (IKSK key read data)
+// dbg_status2[21] = m02_axi_rready
+// dbg_status2[31:22] = reserved
+wire [31:0] dbg_status2 = {10'b0,
+                           m02_axi_rready, m02_axi_rvalid, m02_axi_arready, m02_axi_arvalid,
+                           m00_axi_bready, m00_axi_bvalid, m00_axi_wready, m00_axi_wvalid,
+                           m00_axi_awready, m00_axi_awvalid,
+                           m13_axi_rready, m13_axi_rvalid, m13_axi_arready, m13_axi_arvalid,
+                           m03_axi_rready, m03_axi_rvalid, m03_axi_arready, m03_axi_arvalid,
+                           m01_axi_rready, m01_axi_rvalid, m01_axi_arready, m01_axi_arvalid};
+
+// dbg_status3: AXI stream interfaces + latched (sticky) history signals
+// dbg_status3[0]  = axis00_tvalid    (HomGate→BRBack IKS output)
+// dbg_status3[1]  = axis00_tready
+// dbg_status3[2]  = axis02_tvalid    (HomGate→BRBack BK[0] data)
+// dbg_status3[3]  = axis02_tready
+// dbg_status3[4]  = m14_axi_arvalid  (BK1 MM2S read addr)
+// dbg_status3[5]  = m14_axi_arready
+// dbg_status3[6]  = m14_axi_rvalid   (BK1 MM2S read data)
+// dbg_status3[7]  = m14_axi_rready
+// dbg_status3[8]  = m00_axi_arvalid  (S2MM read addr - should be unused)
+// dbg_status3[9]  = m00_axi_arready
+// --- Latched (sticky) debug signals: set once, never cleared ---
+// dbg_status3[10] = TLWEADD output ever valid (axi4sadded_TVALID)
+// dbg_status3[11] = AXISIKS output ever valid (axi4siksout_TVALID)
+// dbg_status3[12] = axis00 ever valid (IKS data ever sent to BRBack)
+// dbg_status3[13] = axis01 ever valid (globalout ever received from BRBack)
+// dbg_status3[14] = axis02 TREADY ever high (BRBack ever consumed BK[0])
+// dbg_status3[15] = CT input A DataMover output ever valid (axi4sina_TVALID)
+// dbg_status3[16] = CT input B DataMover output ever valid (axi4sinb_TVALID)
+// dbg_status3[17] = IKSK ch0 DataMover output ever valid (axi4ikskin_0_TVALID)
+// dbg_status3[25:18] = axis00 beat counter (IKS beats sent, saturates at 255)
+// dbg_status3[31:26] = TLWEADD output beat counter (saturates at 63)
+
+reg        dbg_tlweadd_ever;
+reg        dbg_iksout_ever;
+reg        dbg_axis00_ever;
+reg        dbg_axis01_ever;
+reg        dbg_axis02_ever_r;
+reg        dbg_ina_ever;
+reg        dbg_inb_ever;
+reg        dbg_iksk0_ever;
+reg [7:0]  dbg_axis00_cnt;
+reg [5:0]  dbg_tlweadd_cnt;
+
+always @(posedge ap_clk) begin
+    if (!ap_rst_n) begin
+        dbg_tlweadd_ever <= 0;
+        dbg_iksout_ever  <= 0;
+        dbg_axis00_ever  <= 0;
+        dbg_axis01_ever  <= 0;
+        dbg_axis02_ever_r <= 0;
+        dbg_ina_ever     <= 0;
+        dbg_inb_ever     <= 0;
+        dbg_iksk0_ever   <= 0;
+        dbg_axis00_cnt   <= 0;
+        dbg_tlweadd_cnt  <= 0;
+    end else begin
+        if (axi4sadded_TVALID)      dbg_tlweadd_ever <= 1;
+        if (axi4siksout_TVALID)     dbg_iksout_ever  <= 1;
+        if (axis00_tvalid)          dbg_axis00_ever  <= 1;
+        if (axis01_tvalid)          dbg_axis01_ever  <= 1;
+        if (axis02_tready)          dbg_axis02_ever_r <= 1;
+        if (axi4sina_TVALID)        dbg_ina_ever     <= 1;
+        if (axi4sinb_TVALID)        dbg_inb_ever     <= 1;
+        if (axi4ikskin_0_TVALID)    dbg_iksk0_ever   <= 1;
+        // Saturating beat counters
+        if (axis00_tvalid & axis00_tready & (dbg_axis00_cnt != 8'hFF))
+            dbg_axis00_cnt <= dbg_axis00_cnt + 1;
+        if (axi4sadded_TVALID & axi4sadded_TREADY & (dbg_tlweadd_cnt != 6'h3F))
+            dbg_tlweadd_cnt <= dbg_tlweadd_cnt + 1;
+    end
+end
+
+wire [31:0] dbg_status3 = {dbg_tlweadd_cnt,
+                           dbg_axis00_cnt,
+                           dbg_iksk0_ever, dbg_inb_ever, dbg_ina_ever,
+                           dbg_axis02_ever_r, dbg_axis01_ever, dbg_axis00_ever,
+                           dbg_iksout_ever, dbg_tlweadd_ever,
+                           m00_axi_arready, m00_axi_arvalid,
+                           m14_axi_rready, m14_axi_rvalid, m14_axi_arready, m14_axi_arvalid,
+                           axis02_tready, axis02_tvalid,
+                           axis00_tready, axis00_tvalid};
+
+// =========================================================================
+// dbg_status4: BRBack internal debug (received via axis10 debug stream)
+// =========================================================================
+// axis10 receiver: always consume, pipeline for timing, latch latest value
+assign axis10_tready = 1'b1;
+
+reg [31:0] brdbg_pipe0, brdbg_pipe1, brdbg_pipe2, brdbg_pipe3;
+always @(posedge ap_clk) begin
+    if (!ap_rst_n) begin
+        brdbg_pipe0 <= 0;
+        brdbg_pipe1 <= 0;
+        brdbg_pipe2 <= 0;
+        brdbg_pipe3 <= 0;
+    end else begin
+        brdbg_pipe0 <= axis10_tvalid ? axis10_tdata : brdbg_pipe0;
+        brdbg_pipe1 <= brdbg_pipe0;
+        brdbg_pipe2 <= brdbg_pipe1;
+        brdbg_pipe3 <= brdbg_pipe2;
+    end
+end
+
+wire [31:0] dbg_status4 = brdbg_pipe3;
 
 // AXISIKS: Identity Key Switching
 wire axi4siksout_TVALID;
@@ -1850,16 +2053,29 @@ BK2Formerslice globalinsliceSLR0toSLR1(
 assign axis00_tkeep = {64{1'b1}};
 assign axis00_tlast = 1'b0;
 
-// GlobalOutslice: axis01 (from BRFront) -> S2MM DataMover input
+// GlobalOutslice: axis01 (from BRFront) -> pre-TLAST wires
 GlobalOutslice globaloutsliceSLR1toSLR0(
   .clock(ap_clk),
   .reset(areset),
   .io_subordinate_TVALID(axis01_tvalid),
   .io_subordinate_TREADY(axis01_tready),
   .io_subordinate_TDATA(axis01_tdata),
+  .io_manager_TVALID(gout_pre_TVALID),
+  .io_manager_TREADY(gout_pre_TREADY),
+  .io_manager_TDATA(gout_pre_TDATA)
+);
+
+// S2MMTlastCounter: generates TLAST for S2MM DRE flush (1025 beats per TLWE)
+S2MMTlastCounter s2mmtlastcnt(
+  .clock(ap_clk),
+  .reset(areset),
+  .io_subordinate_TVALID(gout_pre_TVALID),
+  .io_subordinate_TREADY(gout_pre_TREADY),
+  .io_subordinate_TDATA(gout_pre_TDATA),
   .io_manager_TVALID(axi4sout_TVALID),
   .io_manager_TREADY(axi4sout_TREADY),
-  .io_manager_TDATA(axi4sout_TDATA)
+  .io_manager_TDATA(axi4sout_TDATA),
+  .io_tlast(axi4sout_TLAST)
 );
 
 // Debug: BK DataMover output monitoring (datamover13 = BK channel 0)

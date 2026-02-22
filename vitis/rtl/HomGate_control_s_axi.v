@@ -54,7 +54,13 @@ module HomGate_control_s_axi #(
     output wire [63:0]                     axi17_ptr0,
     output wire [63:0]                     axi18_ptr0,
     output wire [63:0]                     axi19_ptr0,
-    output wire [63:0]                     axi20_ptr0
+    output wire [63:0]                     axi20_ptr0,
+    // Debug register inputs (read-only from host)
+    input  wire [31:0]                     dbg_status0,
+    input  wire [31:0]                     dbg_status1,
+    input  wire [31:0]                     dbg_status2,
+    input  wire [31:0]                     dbg_status3,
+    input  wire [31:0]                     dbg_status4
 );
 
     //------------------------Address Info-------------------
@@ -141,6 +147,11 @@ module HomGate_control_s_axi #(
         ADDR_AXI19_PTR0_DATA_1   = 12'h110,
         ADDR_AXI20_PTR0_DATA_0   = 12'h118,
         ADDR_AXI20_PTR0_DATA_1   = 12'h11c,
+        ADDR_DBG_STATUS0         = 12'h200,
+        ADDR_DBG_STATUS1         = 12'h204,
+        ADDR_DBG_STATUS2         = 12'h208,
+        ADDR_DBG_STATUS3         = 12'h20C,
+        ADDR_DBG_STATUS4         = 12'h210,
         WRIDLE                   = 2'd0,
         WRDATA                   = 2'd1,
         WRRESP                   = 2'd2,
@@ -353,6 +364,11 @@ module HomGate_control_s_axi #(
                     ADDR_AXI19_PTR0_DATA_1: rdata <= int_axi19_ptr0[63:32];
                     ADDR_AXI20_PTR0_DATA_0: rdata <= int_axi20_ptr0[31:0];
                     ADDR_AXI20_PTR0_DATA_1: rdata <= int_axi20_ptr0[63:32];
+                    ADDR_DBG_STATUS0: rdata <= dbg_status0;
+                    ADDR_DBG_STATUS1: rdata <= dbg_status1;
+                    ADDR_DBG_STATUS2: rdata <= dbg_status2;
+                    ADDR_DBG_STATUS3: rdata <= dbg_status3;
+                    ADDR_DBG_STATUS4: rdata <= dbg_status4;
                     default: rdata <= 32'b0;
                 endcase
             end

@@ -67,7 +67,7 @@ set_property -dict [list \
     CONFIG.c_mm2s_btt_used {23} \
     CONFIG.c_include_mm2s_stsfifo {false} \
     CONFIG.c_mm2s_stscmd_is_async {false} \
-    CONFIG.c_mm2s_burst_size {4} \
+    CONFIG.c_mm2s_burst_size {64} \
     CONFIG.c_m_axi_mm2s_id_width {1} \
     CONFIG.c_include_mm2s_dre {false} \
 ] [get_ips axi_datamover_1]
@@ -90,7 +90,7 @@ ipx::associate_bus_interfaces -busif s_axi_control -clock ap_clk [ipx::current_c
 for {set i 0} {$i <= 20} {incr i} {
     ipx::associate_bus_interfaces -busif [format "m%02d_axi" $i] -clock ap_clk [ipx::current_core]
 }
-for {set i 0} {$i <= 9} {incr i} {
+for {set i 0} {$i <= 10} {incr i} {
     ipx::associate_bus_interfaces -busif [format "axis%02d" $i] -clock ap_clk [ipx::current_core]
 }
 

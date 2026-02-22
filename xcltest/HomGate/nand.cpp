@@ -1,5 +1,6 @@
 #include <xcl2.hpp>
 #include <tfhe++.hpp>
+#include <unistd.h>
 
 #define PC_NAME(n) n | XCL_MEM_TOPOLOGY
 constexpr std::array <int, 32> pc = {
@@ -9,9 +10,9 @@ constexpr std::array <int, 32> pc = {
     PC_NAME(24), PC_NAME(25), PC_NAME(26), PC_NAME(27), PC_NAME(28), PC_NAME(29), PC_NAME(30), PC_NAME(31)};
 
 int main(int argc, char* argv[]) {
-	constexpr uint16_t scaleaindex = 2;	
-	constexpr uint16_t scalebindex = 2;	
-	constexpr uint16_t offsetindex = 0;	
+	constexpr uint16_t scaleaindex = 2;
+	constexpr uint16_t scalebindex = 2;
+	constexpr uint16_t offsetindex = 0;
 
 	if (argc != 2) {
         printf("Usage: %s <XCLBIN> \n", argv[0]);
@@ -55,8 +56,11 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
-	// std::cout << "Press Enter to Continue"<<std::endl;
-	// std::cin.ignore();
+    // Wait for ILA connection before proceeding
+    std::cout << "FPGA programmed. Waiting 60s for ILA connection..." << std::endl;
+    std::cout.flush();
+    sleep(60);
+    std::cout << "Proceeding with test..." << std::endl;
 
     //generatros
     std::random_device seed_gen;
@@ -89,7 +93,7 @@ int main(int argc, char* argv[]) {
 
 	alignas(4096) TFHEpp::TLWE<TFHEpp::lvl1param> res = {},kernelres = {};
   	TFHEpp::SampleExtractIndex<TFHEpp::lvl1param>(res,brres,0);
-	
+
 
 	//allgned to distribute to module
 	constexpr uint buswidthlb = 9;
@@ -192,6 +196,7 @@ int main(int argc, char* argv[]) {
 
 			std::cout<<"START gate "<<test<<std::endl;
 			std::cout.flush();
+			sleep(3);
 			auto kernel_start = std::chrono::high_resolution_clock::now();
 			OCL_CHECK(err, err = q.enqueueTask(kernel_bootstrapping));
 			// Copy Result from Device Global Memory to Host Local Memory

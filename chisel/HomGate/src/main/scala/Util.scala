@@ -83,6 +83,36 @@ class GlobalOutslice(implicit val conf:Config) extends Module{
 	io.manager <> slice.io.manager
 }
 
+// Generates TLAST for S2MM DataMover with DRE (32->512 packing)
+// Counts numBeats output beats and asserts TLAST on the last one
+// This is needed to flush the DRE's partial last 512-bit word
+class S2MMTlastCounter(implicit val conf:Config) extends Module{
+	val numBeats = conf.N + 1 // TLWE ciphertext: N+1 coefficients
+	val io = IO(new Bundle{
+		val subordinate = new AXI4StreamSubordinate(conf.Qbit)
+		val manager = new AXI4StreamManager(conf.Qbit)
+		val tlast = Output(Bool())
+	})
+	val counter = RegInit(0.U(log2Ceil(numBeats).W))
+	val lastBeat = counter === (numBeats - 1).U
+
+	// Pass through stream
+	io.manager.TVALID := io.subordinate.TVALID
+	io.subordinate.TREADY := io.manager.TREADY
+	io.manager.TDATA := io.subordinate.TDATA
+
+	// TLAST: assert on last beat when handshake fires
+	io.tlast := lastBeat
+
+	when(io.subordinate.TVALID && io.manager.TREADY){
+		when(lastBeat){
+			counter := 0.U
+		}.otherwise{
+			counter := counter + 1.U
+		}
+	}
+}
+
 class MultPort extends Bundle {
     val A = Input(UInt(64.W))
     val B = Input(UInt(64.W))

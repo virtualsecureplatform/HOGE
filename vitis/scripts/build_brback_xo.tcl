@@ -36,7 +36,7 @@ set_property sdx_kernel true [ipx::current_core]
 set_property sdx_kernel_type rtl [ipx::current_core]
 
 # Associate all bus interfaces with ap_clk
-for {set i 0} {$i <= 17} {incr i} {
+for {set i 0} {$i <= 18} {incr i} {
     ipx::associate_bus_interfaces -busif [format "axis%02d" $i] -clock ap_clk [ipx::current_core]
 }
 
