@@ -1,56 +1,74 @@
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.ChiselEnum
 
 import math.log
 import math.ceil
 
+object DecompositionState extends ChiselEnum {
+  val WAIT, INIT, RUN, LAST = Value
+}
+
 class Decomposition(implicit val conf:Config) extends Module{
 	val io = IO(new Bundle{
-		val in = Input(Vec(conf.chunk,Vec(conf.radix,UInt(conf.Qbit.W))))
+		val in = Input(UInt((conf.block*conf.Qbit).W))
 		val out = Output(Vec(conf.chunk,Vec(conf.radix,UInt(conf.Qbit.W))))
-        val cycle = Output(UInt(conf.cyclebit.W))
-        val sel = Output(UInt(1.W))
-        val valid = Output(Bool())
-        val ready = Input(Bool())
-        val start = Input(Bool())
+        val validin = Input(Bool())
+        val validout = Output(Bool())
 	})
-    val startreg = RegInit(false.B)
+
     val digitreg = RegInit(0.U(log2Ceil(conf.l).W))
-    val cyclereg = RegInit(0.U(conf.cyclebit.W))
-    val selreg = RegInit(0.U(1.W))
-    io.cycle := cyclereg
-    io.sel := selreg
+    val cyclereg = RegInit(0.U((conf.cyclebit+1).W))
 
-    io.valid := false.B
+    val decmem = Module(new WFTPSAmem(2*conf.radix,conf.block*conf.Qbit))
+    decmem.io.in := io.in
+    decmem.io.wen := false.B
+    decmem.io.addr := cyclereg
 
-    when(io.start||startreg){
-        io.valid := true.B
-        when(io.ready){
-            when(cyclereg=/=(conf.numcycle-1).U){
+    io.validout := false.B
+
+    val statereg = RegInit(DecompositionState.WAIT)
+    switch(statereg){
+        is(DecompositionState.WAIT){
+            io.validout := RegNext(io.validin)
+            when(io.validin){
+                decmem.io.wen := true.B
                 cyclereg := cyclereg + 1.U
-                io.cycle := cyclereg + 1.U
+                statereg := DecompositionState.INIT
+            }
+        }
+        is(DecompositionState.INIT){
+            io.validout := RegNext(io.validin)
+            when(io.validin){
+                decmem.io.wen := true.B
+                when(cyclereg=/=(2*conf.numcycle-1).U){
+                    cyclereg := cyclereg + 1.U
+                }.otherwise{
+                    cyclereg := 0.U
+                    digitreg := digitreg + 1.U
+                    statereg := DecompositionState.RUN
+                }
+            }
+        }
+        is(DecompositionState.RUN){
+            io.validout := true.B
+            when(cyclereg=/=(2*conf.numcycle-1).U){
+                cyclereg := cyclereg + 1.U
             }.otherwise{
                 cyclereg := 0.U
-                io.cycle := 0.U
+                digitreg := digitreg + 1.U
+                statereg := DecompositionState.RUN
                 when(digitreg =/= (conf.l-1).U){
                     digitreg := digitreg + 1.U
                 }.otherwise{
                     digitreg := 0.U
-                    when(selreg =/= 1.U){
-                        selreg := 1.U
-                        io.sel := 1.U
-                    }.otherwise{
-                        selreg := 0.U
-                        io.sel := 0.U
-                        startreg := false.B
-                    }
+                    statereg := DecompositionState.LAST
                 }
             }
         }
-    }
-    when(io.start){
-        startreg := true.B
+        is(DecompositionState.LAST){
+            io.validout := true.B
+            statereg := DecompositionState.WAIT
+        }
     }
 
 	def offsetgen(implicit conf: Config): Long = {
@@ -64,86 +82,73 @@ class Decomposition(implicit val conf:Config) extends Module{
 	val offset: Long = offsetgen(conf)
 	val raundoffset: Long = 1L << (conf.Qbit - conf.l * conf.Bgbit - 1)
 
-	for(i <- 0 until conf.chunk){
-        for(j <- 0 until conf.radix){
-        val addedoffset = io.in(i)(j) + (offset + raundoffset).U
-		val extnum = Wire(Vec(conf.l,UInt(conf.Qbit.W)))
-            for(k <- 0 until conf.l){
-                extnum(k) := addedoffset(conf.Qbit-k*conf.Bgbit-1,conf.Qbit-(k+1)*conf.Bgbit)
-            }
-			io.out(i)(j) := extnum(digitreg) - (conf.Bg/2).U
+    for(j <- 0 until conf.radix){
+    val addedoffset = decmem.io.out((j+1)*conf.Qbit-1,j*conf.Qbit) + (offset + raundoffset).U
+    val extnum = Wire(Vec(conf.l,UInt(conf.Qbit.W)))
+        for(k <- 0 until conf.l){
+            extnum(k) := addedoffset(conf.Qbit-k*conf.Bgbit-1,conf.Qbit-(k+1)*conf.Bgbit)
         }
-	}
+        io.out(0)(j) := extnum(RegNext(digitreg)) - (conf.Bg/2).U
+    }
 }
 
 object MULandACCState extends ChiselEnum {
-  val RUN, OUT = Value
+  val RUN, DELAY, OUT = Value
 }
 
-class MULandACC(implicit val conf:Config) extends Module{
+class MULandACCpolynomial(delay: Int,implicit val conf:Config) extends Module{
     val io = IO(new Bundle{
-		val in = Input(Vec(conf.chunk,Vec(conf.radix,UInt(64.W))))
+		val in = Input(UInt((conf.block*64).W))
 		val out = Output(UInt((conf.block*64).W))
-        val trgswin = Input(Vec(2,Vec(conf.chunk,Vec(conf.radix,UInt(64.W)))))
+        val trgswin = Input(Vec(conf.radix,UInt(64.W)))
         val trgswinvalid = Input(Bool())
-        val fifovalid = Input(Bool())
-        val enable = Input(Bool())
-        val ready = Output(Bool())
-        val valid = Output(Bool())
-        val readyin = Input(Bool())
+        val trgswinready = Output(Bool())
+        val validin = Input(Bool())
+        val validout = Output(Bool())
         
-        val debugout = Output(UInt((2*conf.block*64).W))
-
+        val debugvalid = Output(Bool())
+        val debugout = Output(UInt((conf.block*64).W))
 	})
-    io.ready := false.B
+    io.trgswinready := false.B
 
-    val accmem = Module(new RWDmem(conf.numcycle,2*conf.block*64))
+    val accmem = Module(new AccumulateMemory(conf.numcycle,conf.block*64, conf))
 
-    val cyclereg = RegInit(0.U((conf.cyclebit+1).W))
-    io.out := Mux(RegNext(cyclereg(conf.cyclebit)),accmem.io.out>>(conf.block*64),accmem.io.out)
-    val digitreg = RegInit(0.U(log2Ceil(2*conf.l).W))
+    val cyclereg = RegInit(0.U(conf.cyclebit.W))
+    io.out := accmem.io.out
+    val digitreg = RegInit(0.U(log2Ceil((conf.k+1)*conf.l).W))
     val wenwire = Wire(Bool())
     val validwire = Wire(Bool())
     wenwire := false.B
     validwire := false.B
-    io.valid := RegNext(validwire)
+    io.validout := RegNext(validwire)
 
-    accmem.io.wen := ShiftRegister(wenwire,conf.muldelay+1+1)
-    accmem.io.raddr := cyclereg
-    accmem.io.waddr := ShiftRegister(cyclereg,conf.muldelay+1+1)
-    val accbus = Wire(Vec(2,Vec(conf.chunk,Vec(conf.fiber,UInt(64.W)))))
-    for(i<-0 until 2){
-        for(j <- 0 until conf.chunk){
-            for(k <- 0 until conf.radix){
-                val mul = Module(new INTorusMUL)
-                mul.io.A := io.in(j)(k)
-                mul.io.B := io.trgswin(i)(j)(k)
-                val add = Module(new INTorusADD)
-                add.io.A := RegNext(mul.io.Y)
-                add.io.B := RegNext(Mux(ShiftRegister(digitreg===0.U,conf.muldelay),0.U,ShiftRegister(accmem.io.out((i*conf.chunk*conf.radix+j*conf.radix+k+1)*64-1,(i*conf.chunk*conf.radix+j*conf.radix+k)*64),conf.muldelay-1)))
-                accbus(i)(j)(k) := add.io.Y
-            }
-        }
+    val accbus = Wire(Vec(conf.fiber,UInt(64.W)))
+    for(k <- 0 until conf.radix){
+        val mul = Module(new INTorusMUL)
+        mul.io.A := io.in((k+1)*64-1,k*64)
+        mul.io.B := io.trgswin(k)
+        val add = Module(new INTorusADD)
+        add.io.A := RegNext(mul.io.Y)
+        add.io.B := RegNext(Mux(ShiftRegister(digitreg===0.U,conf.muldelay),0.U,ShiftRegister(accmem.io.out((k+1)*64-1,k*64),conf.muldelay-1)))
+        accbus(k) := add.io.Y
     }
-    accmem.io.in := Cat(accbus.flatten.flatten.reverse)
-    io.debugout := Cat(accbus.flatten.flatten.reverse)
+    accmem.io.rreq := false.B
+    accmem.io.wreq := ShiftRegister(wenwire,conf.muldelay+1+1)
+    accmem.io.in := Cat(accbus.reverse)
+    accmem.io.flush := false.B
+    io.debugout := Cat(accbus.reverse)
+    io.debugvalid := accmem.io.wreq
 
     val statereg = RegInit(MULandACCState.RUN)
 
-    // Debug counters
-    val beatcnt = RegInit(0.U(32.W))
-    val stallcnt = RegInit(0.U(32.W))
-    val itercnt = RegInit(0.U(16.W))
-    val hazardwire = accmem.io.wen && (accmem.io.raddr === accmem.io.waddr)
-
     switch(statereg){
         is(MULandACCState.RUN){
-            // Avoid address collision caused by bubbles in HBM.
-            when(io.fifovalid && io.trgswinvalid && (~hazardwire)){
-                io.ready := true.B
+            when(io.validin && io.trgswinvalid){
+                io.trgswinready := true.B
                 wenwire := true.B
-                beatcnt := beatcnt + 1.U
-                stallcnt := 0.U
+                when(digitreg=/=0.U){
+                    accmem.io.rreq := true.B
+                }
                 when(cyclereg=/=(conf.numcycle-1).U){
                     cyclereg := cyclereg + 1.U
                 }.otherwise{
@@ -152,38 +157,66 @@ class MULandACC(implicit val conf:Config) extends Module{
                         digitreg := digitreg + 1.U
                     }.otherwise{
                         digitreg := 0.U
-                        statereg := MULandACCState.OUT
+                        if(delay==0){
+                            statereg := MULandACCState.OUT
+                        }else{
+                            statereg := MULandACCState.DELAY
+                        }
                     }
                 }
-            }.otherwise{
-                stallcnt := stallcnt + 1.U
+            }
+        }
+        is(MULandACCState.DELAY){
+            cyclereg := cyclereg + 1.U
+            when(cyclereg===(conf.numcycle-1).U){
+                cyclereg := 0.U
+                statereg := MULandACCState.OUT
             }
         }
         is(MULandACCState.OUT){
             validwire := true.B
-            stallcnt := 0.U
+            accmem.io.rreq := true.B
             cyclereg := cyclereg + 1.U
-            when(cyclereg===(2*conf.numcycle-1).U){
-                    cyclereg := 0.U
-                    statereg := MULandACCState.RUN
-                    itercnt := itercnt + 1.U
-                    printf(p"MULACC_ITER: iter=${itercnt} beats=${beatcnt}\n")
+            when(cyclereg===(conf.numcycle-1).U){
+                cyclereg := 0.U
+                statereg := MULandACCState.RUN
+                accmem.io.flush := true.B
             }
         }
     }
+}
 
-    // Print stall condition every 5000 cycles of stall
-    when(stallcnt === 5000.U){
-        stallcnt := 0.U
-        printf(p"MULACC_STALL: iter=${itercnt} beats=${beatcnt} fifo=${io.fifovalid} trgsw=${io.trgswinvalid} hazard=${hazardwire} cycle=${cyclereg} digit=${digitreg} state=${statereg.asUInt}\n")
+class MULandACC(implicit val conf:Config) extends Module{
+    val io = IO(new Bundle{
+		val in = Input(UInt((conf.radix*64).W))
+		val out = Output(UInt((conf.block*64).W))
+        val trgswin = Input(Vec(conf.k+1,Vec(conf.radix,UInt(64.W))))
+        val trgswinvalid = Input(Vec(conf.k+1,Bool()))
+        val trgswinready = Output(Vec(conf.k+1,Bool()))
+        val validin = Input(Bool())
+        val validout = Output(Bool())
+        
+        val debugvalid = Output(Vec(2,Bool()))
+        val debugout = Output(Vec(conf.k+1,UInt((conf.block*64).W)))
+	})
+
+    val mulaccpolys = for(i <- 0 until conf.k+1) yield{
+        val mulaccpoly = Module(new MULandACCpolynomial(i,conf))
+        mulaccpoly
     }
-
-    when(~io.enable){
-        statereg := MULandACCState.RUN
-        cyclereg := 0.U
-        digitreg := 0.U
+    mulaccpolys(0).io.in := ShiftRegister(io.in,conf.accnumslice)
+    mulaccpolys(0).io.validin := ShiftRegister(io.validin,conf.accnumslice)
+    mulaccpolys(conf.k).io.in := io.in
+    mulaccpolys(conf.k).io.validin := io.validin
+    for(i <- 0 until conf.k+1){
+        mulaccpolys(i).io.trgswin := io.trgswin(i)
+        mulaccpolys(i).io.trgswinvalid := io.trgswinvalid(i)
+        io.trgswinready(i) := mulaccpolys(i).io.trgswinready
+        io.debugvalid(i) := mulaccpolys(i).io.debugvalid
+        io.debugout(i) := mulaccpolys(i).io.debugout
     }
-
+    io.out := Mux(mulaccpolys(0).io.validout,mulaccpolys(0).io.out,ShiftRegister(mulaccpolys(1).io.out,conf.accnumslice))
+    io.validout := mulaccpolys(0).io.validout | ShiftRegister(mulaccpolys(1).io.validout,conf.accnumslice)
 }
 
 class ExternalProductFormer(implicit val conf:Config) extends Module{
@@ -191,37 +224,19 @@ class ExternalProductFormer(implicit val conf:Config) extends Module{
         val axi4sin = Vec(conf.trlwenumbus,new AXI4StreamSubordinate(conf.buswidth))
         val axi4sout = Vec(conf.trlwenumbus,new AXI4StreamManager(conf.buswidth))
 	})
-    val inmem = Module(new RWDmem(2*conf.radix,conf.block*conf.Qbit))
-    inmem.io.wen := false.B
-    val initreg = RegInit(0.U((conf.radixbit+2).W))
-    inmem.io.waddr := initreg
-    when(io.axi4sin(0).TVALID&&(~initreg(conf.radixbit+1))){
-        initreg := initreg + 1.U
-        inmem.io.wen := true.B
-    }
     val tdatavec = Wire(Vec(conf.trlwenumbus,UInt(conf.buswidth.W)))
     for(i <- 0 until conf.trlwenumbus){
-        io.axi4sin(i).TREADY := io.axi4sin(0).TVALID&&(~initreg(conf.radixbit+1))
+        io.axi4sin(i).TREADY := true.B
         tdatavec(i) := io.axi4sin(i).TDATA
     }
-    inmem.io.in := Cat(tdatavec.reverse)
 
 	val decomp = Module(new Decomposition)
-    inmem.io.raddr := (decomp.io.sel<<conf.radixbit) + decomp.io.cycle
-    decomp.io.start := false.B
+    decomp.io.in := Cat(tdatavec.reverse)
+    decomp.io.validin := io.axi4sin(0).TVALID
 
-    for(i <- 0 until conf.radix){
-        decomp.io.in(0)(i) := inmem.io.out((i+1)*conf.Qbit-1,i*conf.Qbit)
-    }
-
-    decomp.io.ready := io.axi4sout(0).TREADY
-    when(~decomp.io.valid && RegNext(decomp.io.valid)){
-                initreg := 0.U
-    }
-    decomp.io.start := initreg === 1.U
 
     for(i <- 0 until conf.trlwenumbus){
-        io.axi4sout(i).TVALID := decomp.io.valid
+        io.axi4sout(i).TVALID := decomp.io.validout
         io.axi4sout(i).TDATA :=Cat(decomp.io.out(0).reverse)((i+1)*conf.buswidth-1,i*conf.buswidth)
     }
 }
@@ -232,13 +247,13 @@ class ExternalProductPreMiddle(implicit val conf:Config) extends Module{
         val axi4sout = Vec(conf.nttnumbus,new AXI4StreamManager(conf.buswidth))
 
         val inttvalidout = Output(Bool())
-        val inttout = Output(Vec(conf.chunk,Vec(conf.radix,UInt(64.W))))
+        val inttout = Output(Vec(conf.radix,UInt(64.W)))
 	})
 
     val intt = Module(new INTT)
     
     io.inttvalidout := intt.io.validout
-    io.inttout := intt.io.out
+    io.inttout := intt.io.out(0)
 
     val tdatavec = Wire(Vec(conf.trlwenumbus,UInt(conf.buswidth.W)))
     for(i <- 0 until conf.trlwenumbus){
@@ -261,49 +276,38 @@ class ExternalProductMiddle(implicit val conf:Config) extends Module{
 	val io = IO(new Bundle{
         val axi4sin = Vec(conf.nttnumbus,new AXI4StreamSubordinate(conf.buswidth))
         val axi4sout = Vec(conf.nttnumbus,new AXI4StreamManager(conf.buswidth))
-		val trgswin = Input(UInt((2*conf.fiber*64).W))
-        val trgswinvalid = Input(Bool())
-        val trgswinready = Output(Bool())
+		val trgswin = Input(Vec(conf.k+1,UInt((conf.fiber*64).W)))
+        val trgswinvalid = Input(Vec(conf.k+1,Bool()))
+        val trgswinready = Output(Vec(conf.k+1,Bool()))
 
+        val accvalid = Output(Vec(2,Bool()))
         val accout = Output(UInt((2*conf.block*64).W))
-
 	})
-    val inttqueue = Module(new Queue(Vec(conf.chunk,Vec(conf.radix,UInt(64.W))), conf.inttqueuedepth, useSyncReadMem = true))
-    inttqueue.io.enq.valid := ShiftRegister(io.axi4sin(0).TVALID,conf.interslr)
-	val tdatavec = Wire(Vec(conf.nttnumbus,UInt(conf.buswidth.W)))
+
+    val mulandacc = Module(new MULandACC)
+    mulandacc.io.trgswinvalid := io.trgswinvalid
+    io.trgswinready := mulandacc.io.trgswinready
+    for(i<-0 until conf.k+1){
+        for(k <- 0 until conf.radix){
+            mulandacc.io.trgswin(i)(k) := io.trgswin(i)((k+1)*64-1,k*64)
+        }
+    }
+
+    val tdatavec = Wire(Vec(conf.nttnumbus,UInt(conf.buswidth.W)))
 	for(i <- 0 until conf.nttnumbus){
 		io.axi4sin(i).TREADY := true.B
 		tdatavec(i) :=  ShiftRegister(io.axi4sin(i).TDATA,conf.interslr)
 	}
-    for(i <- 0 until conf.radix){
-        inttqueue.io.enq.bits(0)(i) := Cat(tdatavec.reverse)((i+1)*64-1,i*64)
-    }
+    mulandacc.io.in := Cat(tdatavec.reverse)
+    mulandacc.io.validin := ShiftRegister(io.axi4sin(0).TVALID,conf.interslr)
 
-    val mulandacc = Module(new MULandACC)
-    io.trgswinready := mulandacc.io.ready
-    mulandacc.io.trgswinvalid := io.trgswinvalid
-    for(i<-0 until 2){
-        for(j<-0 until conf.chunk){
-            for(k <- 0 until conf.radix){
-                val index = i*conf.fiber+j*conf.radix+k
-                mulandacc.io.trgswin(i)(j)(k) := io.trgswin((index+1)*64-1,index*64)
-            }
-        }
-    }
-    mulandacc.io.in := inttqueue.io.deq.bits
-    mulandacc.io.fifovalid :=  inttqueue.io.deq.valid
-    inttqueue.io.deq.ready := mulandacc.io.ready
-
-    mulandacc.io.enable := true.B
-
-    io.accout := mulandacc.io.debugout
-
-    mulandacc.io.readyin := io.axi4sout(0).TREADY
+    io.accout := Cat(mulandacc.io.debugout.reverse)
+    io.accvalid := mulandacc.io.debugvalid
+    
     for(i <- 0 until conf.nttnumbus){
-        io.axi4sout(i).TVALID := ShiftRegister(mulandacc.io.valid,conf.interslr)
-        io.axi4sout(i).TDATA := ShiftRegister(mulandacc.io.out((i+1)*conf.buswidth-1,i*conf.buswidth),conf.interslr)
+        io.axi4sout(i).TVALID := mulandacc.io.validout
+        io.axi4sout(i).TDATA := mulandacc.io.out((i+1)*conf.buswidth-1,i*conf.buswidth)
     }
-
 }
 
 class ExternalProductLater(implicit val conf:Config) extends Module{
@@ -332,55 +336,4 @@ class ExternalProductLater(implicit val conf:Config) extends Module{
         io.axi4sout(i).TVALID :=  ShiftRegister(ntt.io.validout,conf.interslr/2)
         io.axi4sout(i).TDATA := ShiftRegister(Cat(outdatavec.reverse)((i+1)*conf.buswidth-1,i*conf.buswidth),conf.interslr/2)
     }
-}
-
-class ExternalProduct(implicit val conf:Config) extends Module{
-	val io = IO(new Bundle{
-		val in = Input(Vec(conf.chunk,Vec(conf.radix,UInt(conf.Qbit.W))))
-        val out = Output(Vec(conf.chunk,Vec(conf.radix,UInt(conf.Qbit.W))))
-		val trgswin = Input(UInt((2*conf.fiber*64).W))
-        val trgswinvalid = Input(Bool())
-        val trgswinready = Output(Bool())
-
-        val validin = Input(Bool())
-        val validout = Output(Bool())
-        val fin = Output(Bool())
-
-        val inttvalidout = Output(Bool())
-        val inttout = Output(Vec(conf.chunk,Vec(conf.radix,UInt(64.W))))
-        val accout = Output(UInt((2*conf.block*64).W))
-	})
-
-    val former = Module(new ExternalProductFormer)
-    for(i <- 0 until conf.trlwenumbus){
-        former.io.axi4sin(i).TVALID := io.validin
-        former.io.axi4sin(i).TDATA := Cat(io.in(0).reverse)((i+1)*conf.buswidth-1,i*conf.buswidth)
-    }
-    
-    val premiddle = Module(new ExternalProductPreMiddle)
-    premiddle.io.axi4sin <> former.io.axi4sout
-    io.inttvalidout := premiddle.io.inttvalidout
-    io.inttout := premiddle.io.inttout
-
-    val middle = Module(new ExternalProductMiddle)
-    middle.io.axi4sin <> premiddle.io.axi4sout
-    middle.io.trgswin := io.trgswin
-    middle.io.trgswinvalid := io.trgswinvalid
-    io.trgswinready := middle.io.trgswinready
-    io.accout := middle.io.accout
-
-    val later = Module(new ExternalProductLater)
-    middle.io.axi4sout <> later.io.axi4sin
-
-    val tdatavec = Wire(Vec(conf.trlwenumbus,UInt(conf.buswidth.W)))
-	for(i <- 0 until conf.trlwenumbus){
-		later.io.axi4sout(i).TREADY := true.B
-		tdatavec(i) :=  ShiftRegister(later.io.axi4sout(i).TDATA,conf.interslr/2)
-	}
-    for(i <- 0 until conf.radix){
-        io.out(0)(i) := Cat(tdatavec.reverse)((i+1)*conf.Qbit-1,i*conf.Qbit)
-    }
-
-    io.validout := ShiftRegister(later.io.axi4sout(0).TVALID,conf.interslr/2)
-    io.fin := ~io.validout && RegNext(io.validout)
 }

@@ -19,6 +19,20 @@ class RWSmem(depth:Int, width:Int) extends Module {
     .otherwise    { io.out := rdwrPort }
 }
 
+//Write-First Two Port(1W-1R) shared address mem
+class WFTPSAmem(depth:Int, width:Int) extends Module {
+  val io = IO(new Bundle {
+    val wen = Input(Bool())
+    val addr = Input(UInt(log2Ceil(depth).W))
+    val in = Input(UInt(width.W))
+    val out = Output(UInt(width.W))
+  })
+
+  val mem = SyncReadMem(depth, UInt(width.W),SyncReadMem.WriteFirst)
+  io.out := mem(io.addr)
+  when (io.wen) { mem(io.addr) := io.in }
+}
+
 // Simple Dual Port
 class RWDmem(depth:Int, width:Int) extends Module {
   val io = IO(new Bundle {
@@ -53,6 +67,91 @@ class RWSRmem(depth:Int, width:Int) extends Module {
     .otherwise    { io.out := rdwrPort }
 }
 
+class AccumulateMemory(depth:Int, width:Int, implicit val conf: Config) extends Module {
+  val io = IO(new Bundle {
+    val wreq = Input(Bool())
+    val rreq = Input(Bool())
+    val in = Input(UInt(width.W))
+    val out = Output(UInt(width.W))
+    val flush = Input(Bool())
+  })
+
+  if(conf.useDualPort){
+    val mem = Module(new RWDmem(depth,width))
+    val raddreg = RegInit(0.U(log2Ceil(depth).W))
+    val waddreg = RegInit(0.U(log2Ceil(depth).W))
+
+    mem.io.in := io.in
+    io.out := mem.io.out
+    mem.io.raddr := raddreg
+    mem.io.waddr := waddreg
+    mem.io.wen := io.wreq
+    when(io.rreq){
+      raddreg := raddreg + 1.U
+      when(raddreg === (depth-1).U){
+        raddreg := 0.U
+      }
+    }
+    when(io.wreq){
+      waddreg := waddreg + 1.U
+      when(waddreg === (depth-1).U){
+        waddreg := 0.U
+      }
+    }
+    when(io.flush){
+      raddreg := 0.U
+      waddreg := 0.U
+    }
+  }else{
+    val mems = for( i <- 0 until 3) yield{
+      val mem = Module(new RWSmem(depth/2,width))
+      mem
+    }
+
+    val rselreg = RegInit(0.U(2.W))
+    val raddreg = RegInit(0.U((log2Ceil(depth)-1).W))
+    io.out := DontCare
+    for( i <- 0 until 3){
+      mems(i).io.in := io.in
+      mems(i).io.addr := raddreg
+      mems(i).io.wen := false.B
+      when(RegNext(rselreg) === i.U){
+        io.out := mems(i).io.out
+      }
+    }
+    when(io.rreq){
+      raddreg := raddreg + 1.U
+      when(raddreg === (depth/2-1).U){
+        raddreg := 0.U
+        rselreg := (rselreg + 1.U) % 3.U
+      }
+    }
+
+    //Write has higher priority
+    val wselreg = RegInit(0.U(2.W))
+    val waddreg = RegInit(0.U((log2Ceil(depth)-1).W))
+    for( i <- 0 until 3){
+      when(wselreg === i.U){
+        mems(i).io.wen := io.wreq
+        mems(i).io.addr := waddreg
+      }
+    }
+    when(io.wreq){
+      waddreg := waddreg + 1.U
+      when(waddreg === (depth/2-1).U){
+        waddreg := 0.U
+        wselreg := (wselreg + 1.U) % 3.U
+      }
+    }
+    when(io.flush){
+      rselreg := 0.U
+      raddreg := 0.U
+      wselreg := 0.U
+      waddreg := 0.U
+    }
+  }
+}
+
 class BK2Formerslice(implicit val conf:Config) extends Module{
 	val io = IO(new Bundle{
 		val subordinate = new AXI4StreamSubordinate(conf.buswidth)
@@ -73,6 +172,16 @@ class NTTdataPipeline(implicit val conf:Config) extends Module{
 	io.manager.TVALID := ShiftRegister(io.subordinate.TVALID,conf.axi4snumslice)
 }
 
+class GlobalInslice(implicit val conf:Config) extends Module{
+	val io = IO(new Bundle{
+		val subordinate = new AXI4StreamSubordinate(conf.buswidth)
+		val manager = new AXI4StreamManager(conf.buswidth)
+	})
+	val slice = Module(new AXI4StreamRegisterSlice(conf.buswidth,conf.axi4snumslice))
+	io.subordinate <> slice.io.subordinate
+	io.manager <> slice.io.manager
+}
+
 class GlobalOutslice(implicit val conf:Config) extends Module{
 	val io = IO(new Bundle{
 		val subordinate = new AXI4StreamSubordinate(conf.Qbit)
@@ -81,36 +190,6 @@ class GlobalOutslice(implicit val conf:Config) extends Module{
 	val slice = Module(new AXI4StreamRegisterSlice(conf.Qbit,conf.axi4snumslice))
 	io.subordinate <> slice.io.subordinate
 	io.manager <> slice.io.manager
-}
-
-// Generates TLAST for S2MM DataMover with DRE (32->512 packing)
-// Counts numBeats output beats and asserts TLAST on the last one
-// This is needed to flush the DRE's partial last 512-bit word
-class S2MMTlastCounter(implicit val conf:Config) extends Module{
-	val numBeats = conf.N + 1 // TLWE ciphertext: N+1 coefficients
-	val io = IO(new Bundle{
-		val subordinate = new AXI4StreamSubordinate(conf.Qbit)
-		val manager = new AXI4StreamManager(conf.Qbit)
-		val tlast = Output(Bool())
-	})
-	val counter = RegInit(0.U(log2Ceil(numBeats).W))
-	val lastBeat = counter === (numBeats - 1).U
-
-	// Pass through stream
-	io.manager.TVALID := io.subordinate.TVALID
-	io.subordinate.TREADY := io.manager.TREADY
-	io.manager.TDATA := io.subordinate.TDATA
-
-	// TLAST: assert on last beat when handshake fires
-	io.tlast := lastBeat
-
-	when(io.subordinate.TVALID && io.manager.TREADY){
-		when(lastBeat){
-			counter := 0.U
-		}.otherwise{
-			counter := counter + 1.U
-		}
-	}
 }
 
 class MultPort extends Bundle {

@@ -1,6 +1,5 @@
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.ChiselEnum
 
 class Lbuffer(val width:Int , val delay:Int, implicit val conf:Config) extends Module{
     val io = IO(new Bundle{
@@ -86,15 +85,13 @@ class INTT(implicit val conf:Config) extends Module{
     val io = IO(new NTTport)
 
     val formerinttbuts = for(i <- 0 until conf.chunk) yield{
-        val inttbut = Module(new FormerINTTradixButterflyUnit(conf.radixbit))
+        val inttbut = Module(new FormerINTTradixButterflyUnit(conf.radixbit,true))
         inttbut
     }
     val laterinttbuts = for(i <- 0 until conf.chunk) yield{
         val inttbut = Module(new INTTradixButterflyUnit(conf.radixbit))
         inttbut
     }
-
-    val inttlbuf = Module(new DoubleLbuffer(64,conf.lshdelay+conf.radixdelay*conf.radixbit+2+conf.muldelay,conf))
 
     def reverse(in: Int, n: Int, out: Int = 0): Int =
         if (n == 0) out
@@ -104,7 +101,7 @@ class INTT(implicit val conf:Config) extends Module{
     for(i <- 0 until conf.numcycle){
         for(j <- 0 until conf.chunk){
             for(k <- 0 until conf.radix){
-                twidlebus(i)(j)(k) := ((((conf.intttable(reverse(k,conf.radixbit)*(i*conf.chunk+j))*conf.intttwist(i*conf.chunk+j)) % conf.P) + conf.P) % conf.P).U
+                twidlebus(i)(j)(k) := ((((conf.intttable(reverse(i,conf.radixbit)*(k*conf.chunk+j))*conf.intttwist(k*conf.chunk+j)) % conf.P) + conf.P) % conf.P).U
             }
         }
     }
@@ -112,21 +109,21 @@ class INTT(implicit val conf:Config) extends Module{
     val cntreg = RegInit(0.U(conf.cyclebit.W))
 
     for(i <- 0 until conf.chunk){
-        for(j <- 0 until conf.radix){
+        formerinttbuts(i).io.validin := RegNext(io.validin)
+        formerinttbuts(i).io.in(0) := RegNext(io.in(i)(0))
+        laterinttbuts(i).io.in(0) := ShiftRegister(formerinttbuts(i).io.out(0),1+conf.muldelay+1)
+        for(j <- 1 until conf.radix){
             formerinttbuts(i).io.in(j) := RegNext(io.in(i)(j))
             val twidlemul = Module(new INTorusMUL)
-            twidlemul.io.A := formerinttbuts(i).io.out(j)
-            twidlemul.io.B := RegNext(twidlebus(ShiftRegister(cntreg,conf.radixdelay*conf.radixbit+conf.lshdelay))(i)(j))
-            inttlbuf.io.in(i)(j) := RegNext(twidlemul.io.Y)
+            twidlemul.io.A := RegNext(formerinttbuts(i).io.out(j))
+            twidlemul.io.B := RegNext(twidlebus(cntreg)(i)(j))
+            laterinttbuts(i).io.in(j) := RegNext(twidlemul.io.Y)
         }
-        laterinttbuts(i).io.in := inttlbuf.io.out(i)
         io.out(i) := RegNext(laterinttbuts(i).io.out)
     }
 
-    inttlbuf.io.validin := io.validin && (cntreg === 0.U)
-    io.validout := ShiftRegister(inttlbuf.io.validout,conf.radixdelay*conf.radixbit+1)
-
-    when(io.validin){
+    io.validout := ShiftRegister(formerinttbuts(0).io.validout,1+conf.muldelay+1+conf.radixdelay*conf.radixbit+1)
+    when(formerinttbuts(0).io.validout){
         cntreg := cntreg + 1.U
         when(cntreg === (conf.numcycle-1).U){
             cntreg := 0.U
@@ -146,11 +143,9 @@ class NTT(implicit val conf:Config) extends Module{
     }
 
     val laternttbuts = for(i <- 0 until conf.chunk) yield{
-        val nttbut = Module(new LaterNTTradixButterflyUnit(conf.radixbit))
+        val nttbut = Module(new LaterNTTradixButterflyUnit(conf.radixbit,true))
         nttbut
     }
-
-    val nttlbuf = Module(new DoubleLbuffer(64,1+conf.radixdelay*conf.radixbit,conf))
 
     def reverse(in: Int, n: Int, out: Int = 0): Int =
         if (n == 0) out
@@ -160,29 +155,26 @@ class NTT(implicit val conf:Config) extends Module{
     for(i <- 0 until conf.numcycle){
         for(j <- 0 until conf.chunk){
             for(k <- 0 until conf.radix){
-                twidlebus(i)(j)(k) := ((((conf.ntttable(reverse(k,conf.radixbit)*(i*conf.chunk+j))*conf.ntttwist(i*conf.chunk+j)) % conf.P) + conf.P) % conf.P).U
+                twidlebus(i)(j)(k) := ((((conf.ntttable(reverse(i,conf.radixbit)*(k*conf.chunk+j))*conf.ntttwist(k*conf.chunk+j)) % conf.P) + conf.P) % conf.P).U
             }
         }
     }
 
     val cntreg = RegInit(0.U(conf.cyclebit.W))
-
     for(i <- 0 until conf.chunk){
         for(j <- 0 until conf.radix){
             formernttbuts(i).io.in(j) := RegNext(io.in(i)(j))
-            nttlbuf.io.in(i)(j) := formernttbuts(i).io.out(j)
             val twidlemul = Module(new INTorusMUL)
-            twidlemul.io.A := RegNext(nttlbuf.io.out(i)(j))
-            twidlemul.io.B := RegNext(twidlebus(ShiftRegister(cntreg,1+conf.radixdelay*conf.radixbit+conf.numcycle))(i)(j))
+            twidlemul.io.A := RegNext(formernttbuts(i).io.out(j))
+            twidlemul.io.B := RegNext(twidlebus(cntreg)(i)(j))
             laternttbuts(i).io.in(j) := RegNext(twidlemul.io.Y)
         }
+        laternttbuts(i).io.validin := ShiftRegister(io.validin,1+conf.radixdelay*conf.radixbit+1+conf.muldelay+1)
         io.out(i) := RegNext(laternttbuts(i).io.out)
     }
 
-    io.validout := ShiftRegister(nttlbuf.io.validout,2+conf.muldelay+conf.radixdelay*conf.radixbit+conf.lshdelay+1)
-
-    nttlbuf.io.validin := io.validin && (cntreg === 0.U)
-    when(io.validin){
+    io.validout := laternttbuts(0).io.validout
+    when(ShiftRegister(io.validin,1+conf.radixdelay*conf.radixbit)){
         cntreg := cntreg + 1.U
         when(cntreg === (conf.numcycle-1).U){
             cntreg := 0.U

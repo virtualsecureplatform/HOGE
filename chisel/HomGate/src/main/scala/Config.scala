@@ -3,12 +3,16 @@ case class Config() {
     //Simulate Mode
     val velirate = true
 
+    //Hardware Configuration
+    val useDualPort = true
+
     //security parameters
     val n = 636
     val Nbit = 10
     val N = 1<<Nbit
     val Bgbit = 6
     val Bg = 1<<Bgbit
+    val k = 1
     val l = 3
     val t = 7
     val basebit = 2
@@ -26,7 +30,10 @@ case class Config() {
     val totaliksknumbus = 40
     val iksknumsegments = totaliksknumbus/iksknumbus
 
-    val axi4snumslice = 14
+    val axi4snumslice = 6
+    val accnumslice = 8
+    val interslr = 8
+
     val cyclebit = 5
     val nttnumbus = 1<<(Nbit-cyclebit+6-9)
     val trlwenumbus = 1<<(Nbit-cyclebit+5-9)
@@ -42,9 +49,7 @@ case class Config() {
     val multiplierpipestage = 7
     val muldelay = multiplierpipestage + 2
     val lshdelay = 3
-    val interslr = 8
     val radixdelay = 5
-    val inttqueuedepth = 32
 
 
     //Constants
