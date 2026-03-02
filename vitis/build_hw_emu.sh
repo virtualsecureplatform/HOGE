@@ -93,7 +93,7 @@ echo "============================================"
 if [ ! -f "${VITIS_DIR}/rtl/HomGateWrap.v" ]; then
     echo "Running sbt to generate HomGateWrap.v..."
     cd "${CHISEL_DIR}"
-    sbt "runMain HomGateWrapTop --target-dir ."
+    sbt run
     cp "${CHISEL_DIR}/HomGateWrap.v" "${VITIS_DIR}/rtl/HomGateWrap.v"
     echo "HomGateWrap.v generated and copied to vitis/rtl/"
     cd "${REPO_DIR}"

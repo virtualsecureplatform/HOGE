@@ -34,6 +34,7 @@ import_files -norecurse [list \
     ${rtl_dir}/HomGateWrap.v \
     ${rtl_dir}/HomGate_top.v \
     ${rtl_dir}/HomGate_control_s_axi.v \
+    ${rtl_dir}/S2MMTlastCounter.v \
 ]
 
 set_property top HomGate [current_fileset]
@@ -50,7 +51,7 @@ set_property -dict [list \
     CONFIG.c_s2mm_btt_used {23} \
     CONFIG.c_include_s2mm_stsfifo {false} \
     CONFIG.c_s2mm_stscmd_is_async {false} \
-    CONFIG.c_s2mm_burst_size {16} \
+    CONFIG.c_s2mm_burst_size {64} \
     CONFIG.c_s2mm_support_indet_btt {false} \
     CONFIG.c_m_axi_s2mm_id_width {4} \
     CONFIG.c_include_s2mm_dre {true} \

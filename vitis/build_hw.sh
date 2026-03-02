@@ -92,7 +92,7 @@ echo "============================================"
 # Always regenerate for hw build (Config.scala may have changed)
 echo "Running sbt to generate HomGateWrap.v..."
 cd "${CHISEL_DIR}"
-sbt "runMain HomGateWrapTop --target-dir ."
+sbt run
 cp "${CHISEL_DIR}/HomGateWrap.v" "${VITIS_DIR}/rtl/HomGateWrap.v"
 echo "HomGateWrap.v generated and copied to vitis/rtl/"
 cd "${REPO_DIR}"
@@ -152,7 +152,6 @@ if [ ! -f "${XCLBIN_FILE}" ]; then
         --kernel_frequency 300 \
         --vivado.synth.jobs 8 \
         --vivado.impl.jobs 8 \
-        --vivado.impl.strategies Performance_ExtraTimingOpt \
         -o "${XCLBIN_FILE}" \
         "${XO_DIR}/HomGate.xo" \
         "${XO_DIR}/BRBack.xo" \
