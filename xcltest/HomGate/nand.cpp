@@ -36,11 +36,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    // Wait for ILA connection before proceeding
-    std::cout << "FPGA programmed. Waiting 60s for ILA connection..." << std::endl;
-    std::cout.flush();
-    sleep(60);
-    std::cout << "Proceeding with test..." << std::endl;
+    std::cout << "FPGA programmed." << std::endl;
 
     //generators
     std::random_device seed_gen;
@@ -143,27 +139,11 @@ int main(int argc, char* argv[]) {
 			std::cout<<"START gate "<<test<<std::endl;
 			std::cout.flush();
 
-			// Read stall counter before kernel launch
-			uint32_t pre_stall = 0;
-			int rret = fpga_read_register(0x120, &pre_stall);
-			std::cout<<"BK stall count (pre-launch): "<<pre_stall<<" (ret="<<rret<<")"<<std::endl;
-			std::cout.flush();
-
-			sleep(3);
 			auto kernel_start = std::chrono::high_resolution_clock::now();
 
 			// Start kernel (non-blocking)
 			int run_idx = fpga_start_kernel(scaleaindex, scalebindex, offsetindex,
 			                                bo_indices, total_bufs);
-
-			// Read stall counter during kernel execution
-			for (int poll = 0; poll < 5; poll++) {
-				usleep(500000); // 0.5s
-				uint32_t mid_stall = 0;
-				fpga_read_register(0x120, &mid_stall);
-				std::cout<<"BK stall count (during, "<<poll<<"): "<<mid_stall<<std::endl;
-				std::cout.flush();
-			}
 
 			// Wait for kernel completion
 			fpga_wait_kernel(run_idx);
@@ -176,11 +156,6 @@ int main(int argc, char* argv[]) {
 
 			kernel_time_in_sec = std::chrono::duration<double>(kernel_end - kernel_start).count();
 			std::cout<<"Gate "<<test<<" kernel time: "<<kernel_time_in_sec*1000.0<<" ms"<<std::endl;
-
-			// Read BK stall counter after gate
-			uint32_t bk_stall_cnt = 0;
-			fpga_read_register(0x120, &bk_stall_cnt);
-			std::cout<<"BK stall count: "<<bk_stall_cnt<<std::endl;
 
 			for(int i = 0; i <= TFHEpp::lvl1param::n; i++){
 				if(kernelres[i] != res[i]){
