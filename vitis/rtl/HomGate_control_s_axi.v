@@ -54,7 +54,7 @@ module HomGate_control_s_axi #(
     output wire [63:0]                     axi17_ptr0,
     output wire [63:0]                     axi18_ptr0,
     output wire [63:0]                     axi19_ptr0,
-    output wire [63:0]                     axi20_ptr0,
+    output wire [63:0]                     axi20_ptr0
 );
 
     //------------------------Address Info-------------------

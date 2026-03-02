@@ -1,6 +1,5 @@
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.ChiselEnum
 
 import math.log
 import math.ceil
@@ -145,7 +144,6 @@ class BlindRotate(implicit val conf:Config) extends Module{
 					statereg := BlindRotateState.PMBXMOWAIT
 				}.otherwise{
 					statereg := BlindRotateState.OUT
-					printf(p"BR_OUT_ENTER: brcntreg=${brcntreg} finreg=${finreg}\n")
 				}
 			}
 		}
@@ -208,40 +206,36 @@ class AXISBRFormer(implicit val conf:Config) extends Module{
 	}
 }
 
-class AXISBRMiddle(implicit val conf:Config) extends Module{
+class AXISBRLater(implicit val conf:Config) extends Module{
 	val io = IO(new Bundle{
 		val axi4bkin = Vec(conf.bknumbus,new AXI4StreamSubordinate(conf.buswidth))
 
 		val axi4sin = Vec(conf.nttnumbus,new AXI4StreamSubordinate(conf.buswidth))
-		val axi4sout = Vec(conf.nttnumbus,new AXI4StreamManager(conf.buswidth))
-
-	})
-
-	val extpmiddle = Module(new ExternalProductMiddle)
-
-	extpmiddle.io.axi4sin <> io.axi4sin
-	extpmiddle.io.axi4sout <> io.axi4sout
-	val tvalidvec = Wire(Vec(conf.bknumbus,Bool()))
-	val tdatavec = Wire(Vec(conf.bknumbus,UInt(conf.buswidth.W)))
-	for(i <- 0 until conf.bknumbus){
-		val slice = Module(new AXI4StreamRegisterSlice(conf.buswidth,conf.axi4snumslice))
-		slice.io.subordinate <> io.axi4bkin(i)
-		slice.io.manager.TREADY := extpmiddle.io.trgswinready
-		tvalidvec(i) := slice.io.manager.TVALID
-		tdatavec(i) := slice.io.manager.TDATA
-	}
-	extpmiddle.io.trgswinvalid := Cat(tvalidvec).andR
-	extpmiddle.io.trgswin := Cat(tdatavec.reverse)
-
-}
-
-class AXISBRLater(implicit val conf:Config) extends Module{
-	val io = IO(new Bundle{
-		val axi4sin = Vec(conf.nttnumbus,new AXI4StreamSubordinate(conf.buswidth))
 		val axi4sout = Vec(conf.trlwenumbus,new AXI4StreamManager(conf.buswidth))
 	})
 
+	val extpmiddle = Module(new ExternalProductMiddle)
 	val extplater = Module(new ExternalProductLater)
-	io.axi4sin <> extplater.io.axi4sin
+
+	for(i<-0 until conf.nttnumbus){
+		extpmiddle.io.axi4sin(i).TVALID := ShiftRegister(io.axi4sin(i).TVALID,4)
+		extpmiddle.io.axi4sin(i).TDATA := ShiftRegister(io.axi4sin(i).TDATA,4)
+		io.axi4sin(i).TREADY := true.B
+	}
+	extpmiddle.io.axi4sout <> extplater.io.axi4sin
+	for(k <- 0 until conf.k+1){
+		val tvalidvec = Wire(Vec(conf.bknumbus/2,Bool()))
+		val tdatavec = Wire(Vec(conf.bknumbus/2,UInt(conf.buswidth.W)))
+		for(i <- 0 until conf.bknumbus/2){
+			val slice = Module(new AXI4StreamRegisterSlice(conf.buswidth,conf.axi4snumslice))
+			slice.io.subordinate <> io.axi4bkin(k*conf.bknumbus/2+i)
+			slice.io.manager.TREADY := extpmiddle.io.trgswinready(k)
+			tvalidvec(i) := slice.io.manager.TVALID
+			tdatavec(i) := slice.io.manager.TDATA
+		}
+		extpmiddle.io.trgswinvalid(k) := Cat(tvalidvec).andR
+		extpmiddle.io.trgswin(k) := Cat(tdatavec.reverse)
+	}
+
 	extplater.io.axi4sout <> io.axi4sout
 }

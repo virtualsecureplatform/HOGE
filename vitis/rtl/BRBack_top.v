@@ -153,7 +153,7 @@ module BRBack #(
   input  wire [C_AXIS17_TDATA_WIDTH/8-1:0]   axis17_tkeep,
   input  wire                                axis17_tlast,
 
-  // axis18: MASTER, 32-bit - debug stream to HomGate
+  // axis18: MASTER, 32-bit - unused debug stream
   output wire                                axis18_tvalid,
   input  wire                                axis18_tready,
   output wire [C_AXIS18_TDATA_WIDTH-1:0]     axis18_tdata,
@@ -170,124 +170,128 @@ module BRBack #(
   end
 
   // --------------------------------------------------------------------------
-  // NTTdataPipeline x4 (axis00-03 -> ntt_pipe_out)
-  // NTTdataPipeline has NO reset and NO TREADY
+  // NTT inputs: no TREADY (pipeline ignores backpressure)
   // --------------------------------------------------------------------------
   assign axis00_tready = 1'b1;
   assign axis01_tready = 1'b1;
   assign axis02_tready = 1'b1;
   assign axis03_tready = 1'b1;
 
-  wire        ntt_pipe_out_0_TVALID;
-  wire [511:0] ntt_pipe_out_0_TDATA;
-  wire        ntt_pipe_out_1_TVALID;
-  wire [511:0] ntt_pipe_out_1_TDATA;
-  wire        ntt_pipe_out_2_TVALID;
-  wire [511:0] ntt_pipe_out_2_TDATA;
-  wire        ntt_pipe_out_3_TVALID;
-  wire [511:0] ntt_pipe_out_3_TDATA;
+  // --------------------------------------------------------------------------
+  // BK2Formerslice x8: register slices for BK channels (axis06-13)
+  // --------------------------------------------------------------------------
+  wire        bk_slice_out_0_TVALID;
+  wire        bk_slice_out_0_TREADY;
+  wire [511:0] bk_slice_out_0_TDATA;
+  wire        bk_slice_out_1_TVALID;
+  wire        bk_slice_out_1_TREADY;
+  wire [511:0] bk_slice_out_1_TDATA;
+  wire        bk_slice_out_2_TVALID;
+  wire        bk_slice_out_2_TREADY;
+  wire [511:0] bk_slice_out_2_TDATA;
+  wire        bk_slice_out_3_TVALID;
+  wire        bk_slice_out_3_TREADY;
+  wire [511:0] bk_slice_out_3_TDATA;
+  wire        bk_slice_out_4_TVALID;
+  wire        bk_slice_out_4_TREADY;
+  wire [511:0] bk_slice_out_4_TDATA;
+  wire        bk_slice_out_5_TVALID;
+  wire        bk_slice_out_5_TREADY;
+  wire [511:0] bk_slice_out_5_TDATA;
+  wire        bk_slice_out_6_TVALID;
+  wire        bk_slice_out_6_TREADY;
+  wire [511:0] bk_slice_out_6_TDATA;
+  wire        bk_slice_out_7_TVALID;
+  wire        bk_slice_out_7_TREADY;
+  wire [511:0] bk_slice_out_7_TDATA;
 
-  NTTdataPipeline nttPipe0 (
-    .clock              (ap_clk),
-    .io_subordinate_TVALID (axis00_tvalid),
-    .io_subordinate_TDATA  (axis00_tdata),
-    .io_manager_TVALID     (ntt_pipe_out_0_TVALID),
-    .io_manager_TDATA      (ntt_pipe_out_0_TDATA)
+  BK2Formerslice bk2slice_0 (
+    .clock(ap_clk), .reset(areset),
+    .io_subordinate_TVALID(axis06_tvalid), .io_subordinate_TREADY(axis06_tready), .io_subordinate_TDATA(axis06_tdata),
+    .io_manager_TVALID(bk_slice_out_0_TVALID), .io_manager_TREADY(bk_slice_out_0_TREADY), .io_manager_TDATA(bk_slice_out_0_TDATA)
   );
-
-  NTTdataPipeline nttPipe1 (
-    .clock              (ap_clk),
-    .io_subordinate_TVALID (axis01_tvalid),
-    .io_subordinate_TDATA  (axis01_tdata),
-    .io_manager_TVALID     (ntt_pipe_out_1_TVALID),
-    .io_manager_TDATA      (ntt_pipe_out_1_TDATA)
+  BK2Formerslice bk2slice_1 (
+    .clock(ap_clk), .reset(areset),
+    .io_subordinate_TVALID(axis07_tvalid), .io_subordinate_TREADY(axis07_tready), .io_subordinate_TDATA(axis07_tdata),
+    .io_manager_TVALID(bk_slice_out_1_TVALID), .io_manager_TREADY(bk_slice_out_1_TREADY), .io_manager_TDATA(bk_slice_out_1_TDATA)
   );
-
-  NTTdataPipeline nttPipe2 (
-    .clock              (ap_clk),
-    .io_subordinate_TVALID (axis02_tvalid),
-    .io_subordinate_TDATA  (axis02_tdata),
-    .io_manager_TVALID     (ntt_pipe_out_2_TVALID),
-    .io_manager_TDATA      (ntt_pipe_out_2_TDATA)
+  BK2Formerslice bk2slice_2 (
+    .clock(ap_clk), .reset(areset),
+    .io_subordinate_TVALID(axis08_tvalid), .io_subordinate_TREADY(axis08_tready), .io_subordinate_TDATA(axis08_tdata),
+    .io_manager_TVALID(bk_slice_out_2_TVALID), .io_manager_TREADY(bk_slice_out_2_TREADY), .io_manager_TDATA(bk_slice_out_2_TDATA)
   );
-
-  NTTdataPipeline nttPipe3 (
-    .clock              (ap_clk),
-    .io_subordinate_TVALID (axis03_tvalid),
-    .io_subordinate_TDATA  (axis03_tdata),
-    .io_manager_TVALID     (ntt_pipe_out_3_TVALID),
-    .io_manager_TDATA      (ntt_pipe_out_3_TDATA)
+  BK2Formerslice bk2slice_3 (
+    .clock(ap_clk), .reset(areset),
+    .io_subordinate_TVALID(axis09_tvalid), .io_subordinate_TREADY(axis09_tready), .io_subordinate_TDATA(axis09_tdata),
+    .io_manager_TVALID(bk_slice_out_3_TVALID), .io_manager_TREADY(bk_slice_out_3_TREADY), .io_manager_TDATA(bk_slice_out_3_TDATA)
+  );
+  BK2Formerslice bk2slice_4 (
+    .clock(ap_clk), .reset(areset),
+    .io_subordinate_TVALID(axis10_tvalid), .io_subordinate_TREADY(axis10_tready), .io_subordinate_TDATA(axis10_tdata),
+    .io_manager_TVALID(bk_slice_out_4_TVALID), .io_manager_TREADY(bk_slice_out_4_TREADY), .io_manager_TDATA(bk_slice_out_4_TDATA)
+  );
+  BK2Formerslice bk2slice_5 (
+    .clock(ap_clk), .reset(areset),
+    .io_subordinate_TVALID(axis11_tvalid), .io_subordinate_TREADY(axis11_tready), .io_subordinate_TDATA(axis11_tdata),
+    .io_manager_TVALID(bk_slice_out_5_TVALID), .io_manager_TREADY(bk_slice_out_5_TREADY), .io_manager_TDATA(bk_slice_out_5_TDATA)
+  );
+  BK2Formerslice bk2slice_6 (
+    .clock(ap_clk), .reset(areset),
+    .io_subordinate_TVALID(axis12_tvalid), .io_subordinate_TREADY(axis12_tready), .io_subordinate_TDATA(axis12_tdata),
+    .io_manager_TVALID(bk_slice_out_6_TVALID), .io_manager_TREADY(bk_slice_out_6_TREADY), .io_manager_TDATA(bk_slice_out_6_TDATA)
+  );
+  BK2Formerslice bk2slice_7 (
+    .clock(ap_clk), .reset(areset),
+    .io_subordinate_TVALID(axis13_tvalid), .io_subordinate_TREADY(axis13_tready), .io_subordinate_TDATA(axis13_tdata),
+    .io_manager_TVALID(bk_slice_out_7_TVALID), .io_manager_TREADY(bk_slice_out_7_TREADY), .io_manager_TDATA(bk_slice_out_7_TDATA)
   );
 
   // --------------------------------------------------------------------------
-  // AXISBRMiddle (BK from axis06-13, NTT from ntt_pipe_out)
-  // --------------------------------------------------------------------------
-  wire        middle_out_0_TVALID;
-  wire [511:0] middle_out_0_TDATA;
-  wire [511:0] middle_out_1_TDATA;
-  wire [511:0] middle_out_2_TDATA;
-  wire [511:0] middle_out_3_TDATA;
-
-  AXISBRMiddle axisbrmiddle (
-    .clock                  (ap_clk),
-    .reset                  (areset),
-    // 8 BK inputs from axis06-13
-    .io_axi4bkin_0_TVALID   (axis06_tvalid),
-    .io_axi4bkin_0_TREADY   (axis06_tready),
-    .io_axi4bkin_0_TDATA    (axis06_tdata),
-    .io_axi4bkin_1_TVALID   (axis07_tvalid),
-    .io_axi4bkin_1_TREADY   (axis07_tready),
-    .io_axi4bkin_1_TDATA    (axis07_tdata),
-    .io_axi4bkin_2_TVALID   (axis08_tvalid),
-    .io_axi4bkin_2_TREADY   (axis08_tready),
-    .io_axi4bkin_2_TDATA    (axis08_tdata),
-    .io_axi4bkin_3_TVALID   (axis09_tvalid),
-    .io_axi4bkin_3_TREADY   (axis09_tready),
-    .io_axi4bkin_3_TDATA    (axis09_tdata),
-    .io_axi4bkin_4_TVALID   (axis10_tvalid),
-    .io_axi4bkin_4_TREADY   (axis10_tready),
-    .io_axi4bkin_4_TDATA    (axis10_tdata),
-    .io_axi4bkin_5_TVALID   (axis11_tvalid),
-    .io_axi4bkin_5_TREADY   (axis11_tready),
-    .io_axi4bkin_5_TDATA    (axis11_tdata),
-    .io_axi4bkin_6_TVALID   (axis12_tvalid),
-    .io_axi4bkin_6_TREADY   (axis12_tready),
-    .io_axi4bkin_6_TDATA    (axis12_tdata),
-    .io_axi4bkin_7_TVALID   (axis13_tvalid),
-    .io_axi4bkin_7_TREADY   (axis13_tready),
-    .io_axi4bkin_7_TDATA    (axis13_tdata),
-    // 4 NTT inputs (only channel 0 has TVALID)
-    .io_axi4sin_0_TVALID    (ntt_pipe_out_0_TVALID),
-    .io_axi4sin_0_TDATA     (ntt_pipe_out_0_TDATA),
-    .io_axi4sin_1_TDATA     (ntt_pipe_out_1_TDATA),
-    .io_axi4sin_2_TDATA     (ntt_pipe_out_2_TDATA),
-    .io_axi4sin_3_TDATA     (ntt_pipe_out_3_TDATA),
-    // 4 outputs (only channel 0 has TVALID)
-    .io_axi4sout_0_TVALID   (middle_out_0_TVALID),
-    .io_axi4sout_0_TDATA    (middle_out_0_TDATA),
-    .io_axi4sout_1_TDATA    (middle_out_1_TDATA),
-    .io_axi4sout_2_TDATA    (middle_out_2_TDATA),
-    .io_axi4sout_3_TDATA    (middle_out_3_TDATA),
-  );
-
-  // --------------------------------------------------------------------------
-  // AXISBRLater (AXISBRMiddle output -> axis04-05)
+  // AXISBRLater (NTT from axis00-03, BK from bk2slices, output to axis04-05)
+  // Replaces old NTTdataPipeline + AXISBRMiddle + AXISBRLater
   // --------------------------------------------------------------------------
   wire        later_out_0_TVALID;
   wire [511:0] later_out_0_TDATA;
   wire [511:0] later_out_1_TDATA;
 
   AXISBRLater axisbrlater (
-    .clock              (ap_clk),
-    .reset              (areset),
-    .io_axi4sin_0_TVALID  (middle_out_0_TVALID),
-    .io_axi4sin_0_TDATA   (middle_out_0_TDATA),
-    .io_axi4sin_1_TDATA   (middle_out_1_TDATA),
-    .io_axi4sin_2_TDATA   (middle_out_2_TDATA),
-    .io_axi4sin_3_TDATA   (middle_out_3_TDATA),
-    .io_axi4sout_0_TVALID (later_out_0_TVALID),
-    .io_axi4sout_0_TDATA  (later_out_0_TDATA),
-    .io_axi4sout_1_TDATA  (later_out_1_TDATA)
+    .clock                  (ap_clk),
+    .reset                  (areset),
+    // 8 BK inputs from bk2formerslices
+    .io_axi4bkin_0_TVALID   (bk_slice_out_0_TVALID),
+    .io_axi4bkin_0_TREADY   (bk_slice_out_0_TREADY),
+    .io_axi4bkin_0_TDATA    (bk_slice_out_0_TDATA),
+    .io_axi4bkin_1_TVALID   (bk_slice_out_1_TVALID),
+    .io_axi4bkin_1_TREADY   (bk_slice_out_1_TREADY),
+    .io_axi4bkin_1_TDATA    (bk_slice_out_1_TDATA),
+    .io_axi4bkin_2_TVALID   (bk_slice_out_2_TVALID),
+    .io_axi4bkin_2_TREADY   (bk_slice_out_2_TREADY),
+    .io_axi4bkin_2_TDATA    (bk_slice_out_2_TDATA),
+    .io_axi4bkin_3_TVALID   (bk_slice_out_3_TVALID),
+    .io_axi4bkin_3_TREADY   (bk_slice_out_3_TREADY),
+    .io_axi4bkin_3_TDATA    (bk_slice_out_3_TDATA),
+    .io_axi4bkin_4_TVALID   (bk_slice_out_4_TVALID),
+    .io_axi4bkin_4_TREADY   (bk_slice_out_4_TREADY),
+    .io_axi4bkin_4_TDATA    (bk_slice_out_4_TDATA),
+    .io_axi4bkin_5_TVALID   (bk_slice_out_5_TVALID),
+    .io_axi4bkin_5_TREADY   (bk_slice_out_5_TREADY),
+    .io_axi4bkin_5_TDATA    (bk_slice_out_5_TDATA),
+    .io_axi4bkin_6_TVALID   (bk_slice_out_6_TVALID),
+    .io_axi4bkin_6_TREADY   (bk_slice_out_6_TREADY),
+    .io_axi4bkin_6_TDATA    (bk_slice_out_6_TDATA),
+    .io_axi4bkin_7_TVALID   (bk_slice_out_7_TVALID),
+    .io_axi4bkin_7_TREADY   (bk_slice_out_7_TREADY),
+    .io_axi4bkin_7_TDATA    (bk_slice_out_7_TDATA),
+    // 4 NTT inputs from BRFront (only channel 0 has TVALID)
+    .io_axi4sin_0_TVALID    (axis00_tvalid),
+    .io_axi4sin_0_TDATA     (axis00_tdata),
+    .io_axi4sin_1_TDATA     (axis01_tdata),
+    .io_axi4sin_2_TDATA     (axis02_tdata),
+    .io_axi4sin_3_TDATA     (axis03_tdata),
+    // 2 outputs to BRFront
+    .io_axi4sout_0_TVALID   (later_out_0_TVALID),
+    .io_axi4sout_0_TDATA    (later_out_0_TDATA),
+    .io_axi4sout_1_TDATA    (later_out_1_TDATA)
   );
 
   assign axis04_tvalid = later_out_0_TVALID;
@@ -300,7 +304,7 @@ module BRBack #(
   assign axis05_tlast  = 1'b0;
 
   // --------------------------------------------------------------------------
-  // BK2Formerslice (axis15 -> axis14)
+  // BK2Formerslice (axis15 -> axis14) - IKS pass-through
   // --------------------------------------------------------------------------
   BK2Formerslice globalinslice (
     .clock              (ap_clk),
@@ -333,7 +337,7 @@ module BRBack #(
   assign axis16_tkeep = {4{1'b1}};
   assign axis16_tlast = 1'b0;
 
-// axis18: unused debug stream — tie off
+// axis18: tied off (unused)
 assign axis18_tvalid = 1'b0;
 assign axis18_tdata  = 32'b0;
 assign axis18_tkeep  = {4{1'b1}};

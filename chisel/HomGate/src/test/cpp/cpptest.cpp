@@ -4,31 +4,6 @@
 #include <VHomGateWrap.h>
 #include <tfhe++.hpp>
 
-void clock(VHomGateWrap *dut, VerilatedFstC* tfp){
-  static uint time_counter = 0;
-  dut->eval();
-  tfp->dump(1000*time_counter);
-  time_counter++;
-  dut->clock = !dut->clock;
-  dut->eval();
-  tfp->dump(1000*time_counter);
-  time_counter++;
-  dut->clock = !dut->clock;
-}
-
-int main(int argc, char** argv) {
-  //generatros
-  std::random_device seed_gen;
-  std::default_random_engine engine(seed_gen());
-  std::uniform_int_distribution<uint32_t> binary(0, 1);
-  
-  //Initialize TFHEpp objects
-  TFHEpp::SecretKey *sk = new TFHEpp::SecretKey();
-  TFHEpp::KeySwitchingKey<TFHEpp::lvl10param> *iksk = new TFHEpp::KeySwitchingKey<TFHEpp::lvl10param>();
-  TFHEpp::ikskgen<TFHEpp::lvl10param>(*iksk,*sk);
-  TFHEpp::BootstrappingKeyNTT<TFHEpp::lvl01param> *bkntt = new TFHEpp::BootstrappingKeyNTT<TFHEpp::lvl01param>();
-  TFHEpp::bknttgen<TFHEpp::lvl01param>(*bkntt,*sk);
-
   //allgned to distribute to module
   constexpr uint iksknumbus = 10;
   constexpr uint totaliksknumbus = 40;
@@ -46,6 +21,53 @@ int main(int argc, char** argv) {
   constexpr uint wordsinbus = (1U<<buswidthlb)/std::numeric_limits<typename TFHEpp::lvl0param::T>::digits;
   constexpr uint nttwordsinbus = (1U<<buswidthlb)/64;
   constexpr uint alignedlenlvl0 = (((std::numeric_limits<TFHEpp::lvl0param::T>::digits*(TFHEpp::lvl0param::n+1)>>buswidthlb)+1)<<buswidthlb)/std::numeric_limits<TFHEpp::lvl0param::T>::digits;
+
+alignas(4096) std::array<std::array<std::array<std::array<std::array<uint64_t,nttwordsinbus>,numcycle>,(TFHEpp::lvl1param::k+1)*TFHEpp::lvl1param::l>,TFHEpp::lvl0param::n>,bknumbus> bknttaligned = {};
+std::array<uint,bknumbus> buscycle = {};
+
+void clock(VHomGateWrap *dut, VerilatedFstC* tfp){
+  static uint time_counter = 0;
+  const std::array<uint8_t,bknumbus> treadyarray = {dut->io_axi4bkin_0_TREADY,dut->io_axi4bkin_1_TREADY,dut->io_axi4bkin_2_TREADY,dut->io_axi4bkin_3_TREADY,dut->io_axi4bkin_4_TREADY,dut->io_axi4bkin_5_TREADY,dut->io_axi4bkin_6_TREADY,dut->io_axi4bkin_7_TREADY};
+  const std::array<uint8_t*,bknumbus> tvalidarray = {&(dut->io_axi4bkin_0_TVALID),&(dut->io_axi4bkin_1_TVALID),&(dut->io_axi4bkin_2_TVALID),&(dut->io_axi4bkin_3_TVALID),&(dut->io_axi4bkin_4_TVALID),&(dut->io_axi4bkin_5_TVALID),&(dut->io_axi4bkin_6_TVALID),&(dut->io_axi4bkin_7_TVALID)};
+  std::array<uint32_t*,bknumbus> bkbusarray = {dut->io_axi4bkin_0_TDATA,dut->io_axi4bkin_1_TDATA,dut->io_axi4bkin_2_TDATA,dut->io_axi4bkin_3_TDATA,dut->io_axi4bkin_4_TDATA,dut->io_axi4bkin_5_TDATA,dut->io_axi4bkin_6_TDATA,dut->io_axi4bkin_7_TDATA};
+
+  for(int i = 0; i < bknumbus; i++){
+    if(buscycle[i]<numcycle*(TFHEpp::lvl1param::k+1)*TFHEpp::lvl1param::l*TFHEpp::lvl0param::n){
+      *(tvalidarray[i]) = 1;
+      for(int j = 0; j < nttwordsinbus; j++){
+        bkbusarray[i][2*j] = static_cast<uint32_t>(bknttaligned[i][0][0][buscycle[i]][j]);
+        bkbusarray[i][2*j+1] = static_cast<uint32_t>(bknttaligned[i][0][0][buscycle[i]][j]>>32);
+      }
+      if(treadyarray[i]!=0) buscycle[i]++;
+    }else{
+      *(tvalidarray[i]) = 0;
+    }
+  }
+  dut->eval();
+  tfp->dump(1000*time_counter);
+  time_counter++;
+  dut->clock = !dut->clock;
+  dut->eval();
+  tfp->dump(1000*time_counter);
+  time_counter++;
+  dut->clock = !dut->clock;
+}
+
+int main(int argc, char** argv) {
+  //generatros
+  std::random_device seed_gen;
+  std::default_random_engine engine(seed_gen());
+  std::uniform_int_distribution<uint32_t> binary(0, 1);
+
+  //Initialize TFHEpp objects
+  TFHEpp::SecretKey *sk = new TFHEpp::SecretKey();
+  TFHEpp::KeySwitchingKey<TFHEpp::lvl10param> *iksk = new TFHEpp::KeySwitchingKey<TFHEpp::lvl10param>();
+  TFHEpp::ikskgen<TFHEpp::lvl10param>(*iksk,*sk);
+  TFHEpp::BootstrappingKeyNTT<TFHEpp::lvl01param> *bkntt = new TFHEpp::BootstrappingKeyNTT<TFHEpp::lvl01param>();
+  TFHEpp::bknttgen<TFHEpp::lvl01param>(*bkntt,*sk);
+
+  for(int k =0; k < 2; k++) for(int bus = 0; bus < bknumbus/2; bus++) for(int i = 0; i < TFHEpp::lvl0param::n; i++) for(int l = 0; l < TFHEpp::lvl1param::l; l++) for(int kindex = 0; kindex <= TFHEpp::lvl1param::k; kindex++) for(int cycle = 0; cycle < numcycle; cycle++) for(int word = 0; word<nttwordsinbus; word++) bknttaligned[k*bknumbus/2+bus][i][(TFHEpp::lvl1param::k+1)*l+kindex][cycle][word] = (*bkntt)[i][kindex*TFHEpp::lvl1param::l+l][k][cycle*bknumbus/2*nttwordsinbus+bus*nttwordsinbus+word].value;
+
   using alignedTLWElvl0 = std::array<TFHEpp::lvl0param::T,alignedlenlvl0>;
 
   std::array<std::array<std::array<std::array<std::array<std::array<typename TFHEpp::lvl0param::T, hbmwordsinbus>, totaliksknumbus/iksknumbus>, (1 << TFHEpp::lvl10param::basebit) - 1>, TFHEpp::lvl10param::t>,TFHEpp::lvl1param::n>, iksknumbus> ikskaligned = {};
@@ -73,7 +95,7 @@ int main(int argc, char** argv) {
   for(int l = 0; l<= TFHEpp::lvl1param::n; l++) tlwebaligned[l] = tlweb[l];
   TFHEpp::TLWE<TFHEpp::lvl0param> tlwelvl0 = {};
   TFHEpp::IdentityKeySwitch<TFHEpp::lvl10param>(tlwelvl0,tlwelvl1,*iksk);
-  
+
   TFHEpp::Polynomial<TFHEpp::lvl1param> testvec;
   for (int i = 0; i < TFHEpp::lvl1param::n; i++)
       testvec[i] = TFHEpp::lvl1param::μ;
@@ -138,7 +160,7 @@ int main(int argc, char** argv) {
   dut->io_axi4outcmd_TREADY = 1;
   dut->io_axi4inacmd_TREADY = 1;
   dut->io_axi4inbcmd_TREADY = 1;
-  
+
   dut->io_axi4ikskincmd_0_TREADY = 1;
   dut->io_axi4ikskincmd_1_TREADY = 1;
   dut->io_axi4ikskincmd_2_TREADY = 1;
@@ -201,7 +223,7 @@ int main(int argc, char** argv) {
   clock(dut, tfp);
   // for(int i = 0; i<20; i++)clock(dut, tfp);
   // dut->final();
-  // tfp->close(); 
+  // tfp->close();
   // exit(1);
   if(dut->io_axi4ina_TREADY && dut->io_axi4inb_TREADY != 1){
     std::cout<<"NOT READY!"<<std::endl;
@@ -327,7 +349,7 @@ int main(int argc, char** argv) {
   // dut->io_axi4ikskin_17_TVALID = 0;
   // dut->io_axi4ikskin_18_TVALID = 0;
   // dut->io_axi4ikskin_19_TVALID = 0;
-    
+
   int watchdog = 0;
   while(dut->io_ikskvalid==0){
     clock(dut, tfp);
@@ -378,7 +400,16 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
   TFHEpp::TRLWE<TFHEpp::lvl1param> pmbx;
   TFHEpp::PolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(pmbx[0],brres[0],ā);
   TFHEpp::PolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(pmbx[1],brres[1],ā);
-  while(dut->io_debugvalid==0) clock(dut, tfp);
+  watchdog = 0;
+  while(dut->io_debugvalid==0){
+    clock(dut, tfp);
+    watchdog++;
+    if(watchdog>1000){
+      dut->final();
+      tfp->close();
+      exit(1);
+    }
+  }
   for(int l = 0; l < TFHEpp::lvl1param::k+1; l++)
   for(int i = 0; i < radix; i++){
     for(int j = 0; j < radix; j++) {
@@ -386,104 +417,66 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
         std::cout<<"PMBXERROR:"<<l<<":"<<i<<":"<<j<<std::endl;
         std::cout<<dut->io_debugout[j]<<":"<<pmbx[l][radix*j+i]<<std::endl;
         dut->final();
-        tfp->close(); 
+        tfp->close();
         exit(1);
       }
     }
     clock(dut, tfp);
   }
 
-  dut->io_axi4bkin_0_TVALID = 1;
-  dut->io_axi4bkin_1_TVALID = 1;
-  dut->io_axi4bkin_2_TVALID = 1;
-  dut->io_axi4bkin_3_TVALID = 1;
-  dut->io_axi4bkin_4_TVALID = 1;
-  dut->io_axi4bkin_5_TVALID = 1;
-  dut->io_axi4bkin_6_TVALID = 1;
-  dut->io_axi4bkin_7_TVALID = 1;
-
-  for (int j = 0; j < 2*TFHEpp::lvl1param::l; j++){
-    watchdog = 0;
-   
-    for(int cycle = 0; cycle<numcycle;cycle++){
-      // if(i==0&&j==0&&cycle==0) continue;
-      // if(cycle != 0)
-      while(dut->io_axi4bkin_0_TREADY==0){
-        clock(dut, tfp);
-        watchdog++;
-        if(watchdog>1000){
-          dut->final();
-          tfp->close(); 
-          exit(1);
-        }
-      }
-      watchdog = 0;
-      for(int m = 0; m < nttwordsinbus; m++){
-        dut->io_axi4bkin_0_TDATA[2*m] = static_cast<uint32_t>((*bkntt)[i][j][0][cycle*fiber+0*nttwordsinbus+m].value);
-        dut->io_axi4bkin_0_TDATA[2*m+1] = static_cast<uint32_t>((*bkntt)[i][j][0][cycle*fiber+0*nttwordsinbus+m].value>>32);
-        dut->io_axi4bkin_1_TDATA[2*m] = static_cast<uint32_t>((*bkntt)[i][j][0][cycle*fiber+1*nttwordsinbus+m].value);
-        dut->io_axi4bkin_1_TDATA[2*m+1] = static_cast<uint32_t>((*bkntt)[i][j][0][cycle*fiber+1*nttwordsinbus+m].value>>32);
-        dut->io_axi4bkin_2_TDATA[2*m] = static_cast<uint32_t>((*bkntt)[i][j][0][cycle*fiber+2*nttwordsinbus+m].value);
-        dut->io_axi4bkin_2_TDATA[2*m+1] = static_cast<uint32_t>((*bkntt)[i][j][0][cycle*fiber+2*nttwordsinbus+m].value>>32);
-        dut->io_axi4bkin_3_TDATA[2*m] = static_cast<uint32_t>((*bkntt)[i][j][0][cycle*fiber+3*nttwordsinbus+m].value);
-        dut->io_axi4bkin_3_TDATA[2*m+1] = static_cast<uint32_t>((*bkntt)[i][j][0][cycle*fiber+3*nttwordsinbus+m].value>>32);
-        dut->io_axi4bkin_4_TDATA[2*m] = static_cast<uint32_t>((*bkntt)[i][j][1][cycle*fiber+0*nttwordsinbus+m].value);
-        dut->io_axi4bkin_4_TDATA[2*m+1] = static_cast<uint32_t>((*bkntt)[i][j][1][cycle*fiber+0*nttwordsinbus+m].value>>32);
-        dut->io_axi4bkin_5_TDATA[2*m] = static_cast<uint32_t>((*bkntt)[i][j][1][cycle*fiber+1*nttwordsinbus+m].value);
-        dut->io_axi4bkin_5_TDATA[2*m+1] = static_cast<uint32_t>((*bkntt)[i][j][1][cycle*fiber+1*nttwordsinbus+m].value>>32);
-        dut->io_axi4bkin_6_TDATA[2*m] = static_cast<uint32_t>((*bkntt)[i][j][1][cycle*fiber+2*nttwordsinbus+m].value);
-        dut->io_axi4bkin_6_TDATA[2*m+1] = static_cast<uint32_t>((*bkntt)[i][j][1][cycle*fiber+2*nttwordsinbus+m].value>>32);
-        dut->io_axi4bkin_7_TDATA[2*m] = static_cast<uint32_t>((*bkntt)[i][j][1][cycle*fiber+3*nttwordsinbus+m].value);
-        dut->io_axi4bkin_7_TDATA[2*m+1] = static_cast<uint32_t>((*bkntt)[i][j][1][cycle*fiber+3*nttwordsinbus+m].value>>32);
-      }
-      clock(dut, tfp);
-      std::cout<<i<<":"<<j<<":"<<cycle<<std::endl;
-    }
-  }
-
-  dut->io_axi4bkin_0_TVALID = 0;
-  dut->io_axi4bkin_1_TVALID = 0;
-  dut->io_axi4bkin_2_TVALID = 0;
-  dut->io_axi4bkin_3_TVALID = 0;
-  dut->io_axi4bkin_4_TVALID = 0;
-  dut->io_axi4bkin_5_TVALID = 0;
-  dut->io_axi4bkin_6_TVALID = 0;
-  dut->io_axi4bkin_7_TVALID = 0;
-
   // if (ā == 0) continue;
   // Do not use CMUXNTT to avoid unnecessary copy.
   TFHEpp::CMUXNTTwithPolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(
       brres, (*bkntt)[i], ā);
 
-  while(dut->io_debugvalid==0) clock(dut, tfp);
+  watchdog = 0;
+  while(dut->io_debugvalid==0){
+    clock(dut, tfp);
+    watchdog++;
+    if(watchdog>1000){
+      dut->final();
+      tfp->close();
+      exit(1);
+    }
+  }
   // std::cout<<res[0][0]<<":"<<dut->io_debugout[0]<<std::endl;
   // std::cout<<b̄<<":"<<ā<<":"<<b̄+ā<<std::endl;
+  std::cout<<i<<std::endl;
   for(int cycle = 0; cycle<numcycle;cycle++){
     for(int m = 0; m<radix;m++)
     if(dut->io_debugout[m]!=brres[0][m*radix+cycle]){
       std::cout<<i<<":0:"<<cycle<<":"<<m<<std::endl;
       std::cout<<"ERROR:"<<brres[0][m*radix+cycle]<<":"<<dut->io_debugout[m]<<std::endl;
       dut->final();
-      tfp->close(); 
+      tfp->close();
       exit(1);
     }
     clock(dut, tfp);
   }
-  while(dut->io_debugvalid==0) clock(dut, tfp);
+  watchdog = 0;
+  while(dut->io_debugvalid==0){
+    clock(dut, tfp);
+    watchdog++;
+    if(watchdog>1000){
+      dut->final();
+      tfp->close();
+      exit(1);
+    }
+  }
   for(int cycle = 0; cycle<numcycle;cycle++){
     for(int m = 0; m<radix;m++)
     if(dut->io_debugout[m]!=brres[1][m*radix+cycle]){
       std::cout<<i<<":1:"<<cycle<<":"<<m<<std::endl;
       std::cout<<brres[1][m*radix+cycle]<<":"<<dut->io_debugout[m]<<std::endl;
       dut->final();
-      tfp->close(); 
+      tfp->close();
       exit(1);
     }
     clock(dut, tfp);
   }
 }
   dut->io_ap_start = 0;
-  
+
   watchdog = 0;
   dut->io_axi4out_TREADY=1;
   while(dut->io_axi4out_TVALID==0){
@@ -491,7 +484,7 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
     watchdog++;
     if(watchdog>1000){
       dut->final();
-      tfp->close(); 
+      tfp->close();
       exit(1);
     }
   }
@@ -513,14 +506,14 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
       std::cout<<"Error: "<<trueout<<":"<<circout<<std::endl;
       exit(1);
       dut->final();
-      tfp->close(); 
+      tfp->close();
     }
   }
-
+  for(int i = 0; i < bknumbus; i++) buscycle[i] = 0;
   }
 
   dut->final();
-  tfp->close(); 
+  tfp->close();
 
   std::cout<<"PASS"<<std::endl;
 }

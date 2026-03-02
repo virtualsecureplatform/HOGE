@@ -1,13 +1,23 @@
-#include <xcl2.hpp>
 #include <tfhe++.hpp>
 #include <unistd.h>
+#include <chrono>
+#include <iostream>
+#include <random>
 
-#define PC_NAME(n) n | XCL_MEM_TOPOLOGY
-constexpr std::array <int, 32> pc = {
-    PC_NAME(0),  PC_NAME(1),  PC_NAME(2),  PC_NAME(3),  PC_NAME(4),  PC_NAME(5),  PC_NAME(6),  PC_NAME(7),
-    PC_NAME(8),  PC_NAME(9),  PC_NAME(10), PC_NAME(11), PC_NAME(12), PC_NAME(13), PC_NAME(14), PC_NAME(15),
-    PC_NAME(16), PC_NAME(17), PC_NAME(18), PC_NAME(19), PC_NAME(20), PC_NAME(21), PC_NAME(22), PC_NAME(23),
-    PC_NAME(24), PC_NAME(25), PC_NAME(26), PC_NAME(27), PC_NAME(28), PC_NAME(29), PC_NAME(30), PC_NAME(31)};
+// FPGA operations via separate compilation unit (avoids XRT/xcl2 header conflicts)
+extern "C" {
+  int fpga_init(const char* xclbin_path);
+  int fpga_alloc_buffer(int arg_index, size_t size);
+  int fpga_write_buffer(int bo_idx, const void* src, size_t size);
+  int fpga_read_buffer(int bo_idx, void* dst, size_t size);
+  int fpga_sync_to_device(int bo_idx);
+  int fpga_sync_from_device(int bo_idx);
+  int fpga_start_kernel(uint16_t scalea, uint16_t scaleb, uint16_t offset,
+                        const int* bo_indices, int n_bufs);
+  int fpga_wait_kernel(int run_idx);
+  int fpga_read_register(uint32_t offset, uint32_t* value);
+  void fpga_cleanup();
+}
 
 int main(int argc, char* argv[]) {
 	constexpr uint16_t scaleaindex = 2;
@@ -18,42 +28,12 @@ int main(int argc, char* argv[]) {
         printf("Usage: %s <XCLBIN> \n", argv[0]);
         return -1;
     }
-    cl_int err;
-    cl::Context context;
-    cl::CommandQueue q;
-    cl::Kernel kernel_bootstrapping;
     std::string binaryFile = argv[1];
 
-	// The get_xil_devices will return vector of Xilinx Devices
-    auto devices = xcl::get_xil_devices();
-
-    // read_binary_file() command will find the OpenCL binary file created using
-    // the
-    // V++ compiler load into OpenCL Binary and return pointer to file buffer.
-    auto fileBuf = xcl::read_binary_file(binaryFile);
-
-    cl::Program::Binaries bins{{fileBuf.data(), fileBuf.size()}};
-    bool valid_device = false;
-    for (unsigned int i = 0; i < devices.size(); i++) {
-        auto device = devices[i];
-        // Creating Context and Command Queue for selected Device
-        OCL_CHECK(err, context = cl::Context(device, nullptr, nullptr, nullptr, &err));
-        OCL_CHECK(err, q = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, &err));
-
-        std::cout << "Trying to program device[" << i << "]: " << device.getInfo<CL_DEVICE_NAME>() << std::endl;
-        cl::Program program(context, {device}, bins, nullptr, &err);
-        if (err != CL_SUCCESS) {
-            std::cout << "Failed to program device[" << i << "] with xclbin file!\n";
-        } else {
-            std::cout << "Device[" << i << "]: program successful!\n";
-            OCL_CHECK(err, kernel_bootstrapping = cl::Kernel(program, "HomGate", &err));
-            valid_device = true;
-            break; // we break because we found a valid device
-        }
-    }
-    if (!valid_device) {
-        std::cout << "Failed to program any device found, exit!\n";
-        exit(EXIT_FAILURE);
+    // Initialize FPGA via XRT native API
+    if (fpga_init(binaryFile.c_str()) != 0) {
+        std::cout << "Failed to initialize FPGA, exit!" << std::endl;
+        return -1;
     }
 
     // Wait for ILA connection before proceeding
@@ -62,12 +42,12 @@ int main(int argc, char* argv[]) {
     sleep(60);
     std::cout << "Proceeding with test..." << std::endl;
 
-    //generatros
+    //generators
     std::random_device seed_gen;
     std::default_random_engine engine(seed_gen());
     std::uniform_int_distribution<uint32_t> binary(0, 1);
 
-	  //Initialize TFHEpp objects
+	//Initialize TFHEpp objects
 	TFHEpp::SecretKey *sk = new TFHEpp::SecretKey();
 	TFHEpp::KeySwitchingKey<TFHEpp::lvl10param> *iksk = new TFHEpp::KeySwitchingKey<TFHEpp::lvl10param>();
 	TFHEpp::ikskgen<TFHEpp::lvl10param>(*iksk,*sk);
@@ -95,7 +75,7 @@ int main(int argc, char* argv[]) {
   	TFHEpp::SampleExtractIndex<TFHEpp::lvl1param>(res,brres,0);
 
 
-	//allgned to distribute to module
+	//aligned to distribute to module
 	constexpr uint buswidthlb = 9;
 	constexpr uint buswords = 1U<<(buswidthlb-6);
 	constexpr uint iksknumbus = 10;
@@ -105,7 +85,6 @@ int main(int argc, char* argv[]) {
 	constexpr uint numcycle = 1<<cyclebit;
 	constexpr uint wordsinbus = (1U<<buswidthlb)/std::numeric_limits<typename TFHEpp::lvl0param::T>::digits;
 
- 	// constexpr uint alignedlenlvl0 = (((std::numeric_limits<TFHEpp::lvl0param::T>::digits*(TFHEpp::lvl0param::n+1)>>buswidthlb)+1)<<buswidthlb)/std::numeric_limits<TFHEpp::lvl0param::T>::digits;
   	alignas(4096) std::array<std::array<std::array<std::array<std::array<std::array<typename TFHEpp::lvl0param::T, wordsinbus>, totaliksknumbus/iksknumbus>, (1 << TFHEpp::lvl10param::basebit) - 1>, TFHEpp::lvl10param::t>,TFHEpp::lvl1param::n>,iksknumbus> ikskaligned = {},ikskdebug = {};
   	for(int i = 0; i<TFHEpp::lvl1param::n; i++) for(int j = 0; j < TFHEpp::lvl10param::t; j++) for(int k = 0; k< (1 << TFHEpp::lvl10param::basebit) - 1; k++) for(int l = 0; l < wordsinbus; l++) for(int m = 0; m < iksknumbus; m++) for(int n = 0; n < totaliksknumbus/iksknumbus; n++) ikskaligned[m][i][j][k][n][l] = (*iksk)[i][j][k][n*iksknumbus*wordsinbus+m*wordsinbus+l];
 	for(int m = 0; m <iksknumbus; m++) std::cout<<"IKSK bus "<<m<<":"<<std::hex<<ikskaligned[m][0][0][0][0][0]<<std::endl;
@@ -113,111 +92,103 @@ int main(int argc, char* argv[]) {
 	std::cout << "IKSK tail :" << std::hex <<  ikskaligned[0][TFHEpp::lvl1param::n-1][TFHEpp::lvl10param::t-1][(1 << TFHEpp::lvl10param::basebit) - 2][totaliksknumbus/iksknumbus-1][0] <<std::endl;
 
 	alignas(4096) std::array<std::array<std::array<std::array<std::array<uint64_t,buswords>,numcycle>,2*TFHEpp::lvl1param::l>,TFHEpp::lvl0param::n>,bknumbus> bknttaligned = {};
-	for(int k =0; k < 2; k++) for(int bus = 0; bus < bknumbus/2; bus++) for(int i = 0; i < TFHEpp::lvl0param::n; i++) for(int l = 0; l < 2*TFHEpp::lvl1param::l; l++) for(int cycle = 0; cycle < numcycle; cycle++) for(int word = 0; word<buswords; word++) bknttaligned[k*bknumbus/2+bus][i][l][cycle][word] = (*bkntt)[i][l][k][cycle*bknumbus/2*buswords+bus*buswords+word].value;
+	for(int k =0; k < 2; k++) for(int bus = 0; bus < bknumbus/2; bus++) for(int i = 0; i < TFHEpp::lvl0param::n; i++) for(int l = 0; l < TFHEpp::lvl1param::l; l++) for(int kindex = 0; kindex <= TFHEpp::lvl1param::k; kindex++) for(int cycle = 0; cycle < numcycle; cycle++) for(int word = 0; word<buswords; word++) bknttaligned[k*bknumbus/2+bus][i][(TFHEpp::lvl1param::k+1)*l+kindex][cycle][word] = (*bkntt)[i][kindex*TFHEpp::lvl1param::l+l][k][cycle*bknumbus/2*buswords+bus*buswords+word].value;
 	std::cout <<"BK head :"<<std::hex<<bknttaligned[bknumbus-1][0][0][0][0]<<std::endl;
 	std::cout <<"BK tail :"<<std::hex<<bknttaligned[bknumbus-1][TFHEpp::lvl0param::n-1][2*TFHEpp::lvl1param::l-1][numcycle-1][0]<<std::endl;
 
-	double  kernel_time_in_sec;
+	double kernel_time_in_sec;
 	{
-		// For Allocating Buffer to specific Global Memory PC, user has to use
-		// cl_mem_ext_ptr_t
-		// and provide the PCs
-		cl_mem_ext_ptr_t inaBuf, inbBuf, resBuf;
-		std::array<cl_mem_ext_ptr_t, iksknumbus> ikskBufs;
-		std::array<cl_mem_ext_ptr_t, bknumbus> bknttBufs;
+		// Allocate device buffers
+		// arg 3: output (res), arg 4: ina, arg 5: inb, args 6-15: iksk[0-9], args 16-23: bk[0-7]
+		constexpr int total_bufs = 1 + 2 + iksknumbus + bknumbus; // 21
 
-		resBuf.obj = kernelres.data();
-		resBuf.param = 0;
-		resBuf.flags = PC_NAME(0);
+		int bo_res = fpga_alloc_buffer(3, sizeof(kernelres));
+		int bo_ina = fpga_alloc_buffer(4, sizeof(tlwea));
+		int bo_inb = fpga_alloc_buffer(5, sizeof(tlweb));
 
-		inaBuf.obj = tlwea.data();
-		inaBuf.param = 0;
-		inaBuf.flags = PC_NAME(1);
+		std::array<int, iksknumbus> bo_iksks;
+		for(int i = 0; i < iksknumbus; i++)
+			bo_iksks[i] = fpga_alloc_buffer(6 + i, sizeof(ikskaligned[i]));
 
-		inbBuf.obj = tlweb.data();
-		inbBuf.param = 0;
-		inbBuf.flags = PC_NAME(2);
+		std::array<int, bknumbus> bo_bks;
+		for(int i = 0; i < bknumbus; i++)
+			bo_bks[i] = fpga_alloc_buffer(16 + i, sizeof(bknttaligned[i]));
 
-		for(int i = 0; i < iksknumbus; i++){
-			ikskBufs[i].obj = ikskaligned[i].data();
-			ikskBufs[i].param = 0;
-			ikskBufs[i].flags = pc[i+3];
+		// Write key data to buffers and sync to device
+		for(int i = 0; i < iksknumbus; i++) {
+			fpga_write_buffer(bo_iksks[i], ikskaligned[i].data(), sizeof(ikskaligned[i]));
+			fpga_sync_to_device(bo_iksks[i]);
 		}
-
-		for(int i = 0; i < bknumbus; i++){
-			bknttBufs[i].obj = bknttaligned[i].data();
-			bknttBufs[i].param = 0;
-			bknttBufs[i].flags = pc[20+i];
+		for(int i = 0; i < bknumbus; i++) {
+			fpga_write_buffer(bo_bks[i], bknttaligned[i].data(), sizeof(bknttaligned[i]));
+			fpga_sync_to_device(bo_bks[i]);
 		}
+		std::cout<<"Copy"<<std::endl;
 
-		// These commands will allocate memory on the FPGA. The cl::Buffer objects can
-		// be used to reference the memory locations on the device.
-		// Creating Buffers
-		OCL_CHECK(err, cl::Buffer buffer_ina(context, CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX | CL_MEM_USE_HOST_PTR,
-												sizeof(tlwea), &inaBuf, &err));
-		OCL_CHECK(err, cl::Buffer buffer_inb(context, CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX | CL_MEM_USE_HOST_PTR,
-												sizeof(tlweb), &inbBuf, &err));
-		OCL_CHECK(err, cl::Buffer buffer_res(context, CL_MEM_WRITE_ONLY | CL_MEM_EXT_PTR_XILINX | CL_MEM_USE_HOST_PTR,
-												sizeof(kernelres), &resBuf, &err));
-		std::array<std::shared_ptr<cl::Buffer>, iksknumbus> buffer_iksks;
-		for(int i = 0; i < iksknumbus; i++){
-			buffer_iksks[i] = std::make_shared<cl::Buffer>(context, CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX | CL_MEM_USE_HOST_PTR,
-													sizeof(ikskaligned[i]), &ikskBufs[i], &err);
-		}
-		std::array<std::shared_ptr<cl::Buffer>, bknumbus> buffer_bkntts;
-		for(int i = 0; i < bknumbus; i++){
-			buffer_bkntts[i] = std::make_shared<cl::Buffer>(context, CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX | CL_MEM_USE_HOST_PTR,
-													sizeof(bknttaligned[i]), &bknttBufs[i], &err);
-		}
-
-		// Setting the kernel Arguments
-		OCL_CHECK(err, err = (kernel_bootstrapping).setArg(0, scaleaindex)); // scalea
-		OCL_CHECK(err, err = (kernel_bootstrapping).setArg(1, scalebindex)); // scaleb
-		OCL_CHECK(err, err = (kernel_bootstrapping).setArg(2, offsetindex)); // offset
-		OCL_CHECK(err, err = (kernel_bootstrapping).setArg(3, buffer_res));
-		OCL_CHECK(err, err = (kernel_bootstrapping).setArg(4, buffer_ina));
-		OCL_CHECK(err, err = (kernel_bootstrapping).setArg(5, buffer_inb));
-		for(int i = 0; i < iksknumbus; i++) OCL_CHECK(err, err = (kernel_bootstrapping).setArg(i+6, *(buffer_iksks[i])));
-		for(int i = 0; i < bknumbus; i++) OCL_CHECK(err, err = (kernel_bootstrapping).setArg(i+6+iksknumbus, *(buffer_bkntts[i])));
-
-		// Copy input data to Device Global Memory
-        std::cout<<"Copy"<<std::endl;
-		std::vector<cl::Memory> inputs(iksknumbus+bknumbus);
-		for(int i = 0; i < iksknumbus; i++) inputs[i] = *(buffer_iksks[i]);
-		for(int i = 0; i < bknumbus; i++) inputs[i+iksknumbus] = *(buffer_bkntts[i]);
-		OCL_CHECK(err, err = q.enqueueMigrateMemObjects(inputs, 0 /* 0 means from host*/));
-		q.finish();
+		// Build buffer index array for kernel args: res, ina, inb, iksk[0..9], bk[0..7]
+		int bo_indices[total_bufs];
+		bo_indices[0] = bo_res;
+		bo_indices[1] = bo_ina;
+		bo_indices[2] = bo_inb;
+		for(int i = 0; i < iksknumbus; i++) bo_indices[3 + i] = bo_iksks[i];
+		for(int i = 0; i < bknumbus; i++) bo_indices[3 + iksknumbus + i] = bo_bks[i];
 
 		for(int test = 0; test < 10; test++){
-			std::chrono::duration<double> kernel_time(0);
-
-			OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_ina,buffer_inb}, 0 /* 0 means from host*/));
-			q.finish();
+			// Write input data and sync
+			fpga_write_buffer(bo_ina, tlwea.data(), sizeof(tlwea));
+			fpga_write_buffer(bo_inb, tlweb.data(), sizeof(tlweb));
+			fpga_sync_to_device(bo_ina);
+			fpga_sync_to_device(bo_inb);
 
 			std::cout<<"START gate "<<test<<std::endl;
 			std::cout.flush();
+
+			// Read stall counter before kernel launch
+			uint32_t pre_stall = 0;
+			int rret = fpga_read_register(0x120, &pre_stall);
+			std::cout<<"BK stall count (pre-launch): "<<pre_stall<<" (ret="<<rret<<")"<<std::endl;
+			std::cout.flush();
+
 			sleep(3);
 			auto kernel_start = std::chrono::high_resolution_clock::now();
-			OCL_CHECK(err, err = q.enqueueTask(kernel_bootstrapping));
-			// Copy Result from Device Global Memory to Host Local Memory
-			q.finish();
+
+			// Start kernel (non-blocking)
+			int run_idx = fpga_start_kernel(scaleaindex, scalebindex, offsetindex,
+			                                bo_indices, total_bufs);
+
+			// Read stall counter during kernel execution
+			for (int poll = 0; poll < 5; poll++) {
+				usleep(500000); // 0.5s
+				uint32_t mid_stall = 0;
+				fpga_read_register(0x120, &mid_stall);
+				std::cout<<"BK stall count (during, "<<poll<<"): "<<mid_stall<<std::endl;
+				std::cout.flush();
+			}
+
+			// Wait for kernel completion
+			fpga_wait_kernel(run_idx);
 			auto kernel_end = std::chrono::high_resolution_clock::now();
 			std::cout<<"END gate "<<test<<std::endl;
 
-			OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_res}, CL_MIGRATE_MEM_OBJECT_HOST));
-			q.finish();
+			// Read result from device
+			fpga_sync_from_device(bo_res);
+			fpga_read_buffer(bo_res, kernelres.data(), sizeof(kernelres));
 
-			kernel_time = std::chrono::duration<double>(kernel_end - kernel_start);
-
-			kernel_time_in_sec = kernel_time.count();
+			kernel_time_in_sec = std::chrono::duration<double>(kernel_end - kernel_start).count();
 			std::cout<<"Gate "<<test<<" kernel time: "<<kernel_time_in_sec*1000.0<<" ms"<<std::endl;
+
+			// Read BK stall counter after gate
+			uint32_t bk_stall_cnt = 0;
+			fpga_read_register(0x120, &bk_stall_cnt);
+			std::cout<<"BK stall count: "<<bk_stall_cnt<<std::endl;
+
 			for(int i = 0; i <= TFHEpp::lvl1param::n; i++){
 				if(kernelres[i] != res[i]){
 					std::cout<<"ERROR: "<<i<<" : "<<kernelres[i]<<" : "<<res[i]<<std::endl;
-					// exit(1);
 				}
 			}
 		}
 	}
 	std::cout<<"PASS"<<std::endl;
+	fpga_cleanup();
 }

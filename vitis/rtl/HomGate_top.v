@@ -1762,7 +1762,7 @@ HomGateTop homgate(
   .io_ap_ready(ap_ready)
 );
 
-// axis10: unused debug stream — always consume
+// axis10: consume stream (debug counter removed)
 assign axis10_tready = 1'b1;
 
 // AXISIKS: Identity Key Switching

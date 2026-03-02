@@ -1,11 +1,7 @@
-add_executable(nand nand.cpp)
-find_package(OpenCL REQUIRED)
-target_include_directories(
-	nand
-	PRIVATE
-	${CMAKE_SOURCE_DIR}/thirdparties/xcl2
-)
+add_executable(nand nand.cpp xrt_regread.cpp)
 find_package(Threads REQUIRED)
-target_link_libraries(nand PRIVATE tfhe++ xcl2 rt Threads::Threads )
+include_directories(/opt/xilinx/xrt/include)
+link_directories(/opt/xilinx/xrt/lib)
+target_link_libraries(nand PRIVATE tfhe++ /opt/xilinx/xrt/lib/libxrt_coreutil.so rt Threads::Threads )
 file(COPY ../emconfig.json DESTINATION .)
 file(COPY ../xrt.ini DESTINATION .)

@@ -38,8 +38,8 @@ add_subdirectory(chisel/HomGate)
 
 # xcltest contains the codes to run with real FPGA
 # Uncomment the following 
-add_subdirectory(thirdparties/xcl2)
-add_subdirectory(xcltest/HomGate)
+# add_subdirectory(thirdparties/xcl2)
+# add_subdirectory(xcltest/HomGate)
 
 # For developments
 # add_subdirectory(xcltest/AXI4IKS)
