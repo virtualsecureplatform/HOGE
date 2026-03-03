@@ -150,7 +150,10 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 				for(i <- 0 until conf.iksknumbus*conf.hbmbuswidth/conf.qbit){
 					wireacc(i) := 0.U
 				}
-				wireacc(conf.n - (conf.iksknumsegments-1)*conf.hbmbuswidth*conf.iksknumbus/conf.qbit) := io.b
+				if(conf.Qbit > conf.qbit)
+					wireacc(conf.n - (conf.iksknumsegments-1)*conf.hbmbuswidth*conf.iksknumbus/conf.qbit) := (io.b +& (1L << (conf.Qbit - conf.qbit - 1)).U) >> (conf.Qbit - conf.qbit)
+				else
+					wireacc(conf.n - (conf.iksknumsegments-1)*conf.hbmbuswidth*conf.iksknumbus/conf.qbit) := io.b
 				accwriteport := Cat(wireacc.reverse)
 				statereg := IdentityKeySwitchingState.ADDRBUBBLE
 			}			

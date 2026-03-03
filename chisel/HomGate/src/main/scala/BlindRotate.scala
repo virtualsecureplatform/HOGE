@@ -50,8 +50,8 @@ class BlindRotate(implicit val conf:Config) extends Module{
 	pmbxmo.io.enable := RegNext(pmbxmoenablewire)
 	pmbxmoenablewire := false.B
 
-	val roundoffset = 1L<<(conf.Qbit-conf.Nbit-2)
-	pmbxmo.io.exponent := (io.a + roundoffset.U)(conf.Qbit-1,conf.Qbit-(conf.Nbit+1))
+	val roundoffset = 1L<<(conf.qbit-conf.Nbit-2)
+	pmbxmo.io.exponent := (io.a + roundoffset.U)(conf.qbit-1,conf.qbit-(conf.Nbit+1))
 	
 	BRmem.io.raddr := pmbxmo.io.minusaddr
 	pmbxmo.io.minusin := BRmem.io.rout

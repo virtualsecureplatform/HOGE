@@ -1,4 +1,5 @@
 #include <bits/stdint-uintn.h>
+#include <cstring>
 #include <verilated.h>
 #include <verilated_fst_c.h>
 #include <VHomGateWrap.h>
@@ -6,7 +7,7 @@
 
   //allgned to distribute to module
   constexpr uint iksknumbus = 10;
-  constexpr uint totaliksknumbus = 40;
+  constexpr uint totaliksknumbus = 20;
   constexpr uint hbmbuswidthlb = 9;
   constexpr uint hbmbuswords = 1U<<(hbmbuswidthlb-5);
   constexpr uint hbmwordsinbus = (1U<<hbmbuswidthlb)/std::numeric_limits<typename TFHEpp::lvl0param::T>::digits;
@@ -294,33 +295,19 @@ int main(int argc, char** argv) {
     for(int j = 0; j<TFHEpp::lvl10param::t;j++)
       for(int k=0;k<(1<<TFHEpp::lvl10param::basebit)-1;k++){
         for(int l = 0; l < totaliksknumbus/iksknumbus; l++){
-          for(int m = 0; m < hbmbuswords; m++){
-            while(dut->io_axi4ikskin_0_TREADY==0) clock(dut, tfp);
-            dut->io_axi4ikskin_0_TDATA[m] = ikskaligned[0][i][j][k][l][m];
-            dut->io_axi4ikskin_1_TDATA[m] = ikskaligned[1][i][j][k][l][m];
-            dut->io_axi4ikskin_2_TDATA[m] = ikskaligned[2][i][j][k][l][m];
-            dut->io_axi4ikskin_3_TDATA[m] = ikskaligned[3][i][j][k][l][m];
-            dut->io_axi4ikskin_4_TDATA[m] = ikskaligned[4][i][j][k][l][m];
-            dut->io_axi4ikskin_5_TDATA[m] = ikskaligned[5][i][j][k][l][m];
-            dut->io_axi4ikskin_6_TDATA[m] = ikskaligned[6][i][j][k][l][m];
-            dut->io_axi4ikskin_7_TDATA[m] = ikskaligned[7][i][j][k][l][m];
-            dut->io_axi4ikskin_8_TDATA[m] = ikskaligned[8][i][j][k][l][m];
-            dut->io_axi4ikskin_9_TDATA[m] = ikskaligned[9][i][j][k][l][m];
-            // dut->io_axi4ikskin_10_TDATA[m] = ikskaligned[10][i][j][k][l][m];
-            // dut->io_axi4ikskin_11_TDATA[m] = ikskaligned[11][i][j][k][l][m];
-            // dut->io_axi4ikskin_12_TDATA[m] = ikskaligned[12][i][j][k][l][m];
-            // dut->io_axi4ikskin_13_TDATA[m] = ikskaligned[13][i][j][k][l][m];
-            // dut->io_axi4ikskin_14_TDATA[m] = ikskaligned[14][i][j][k][l][m];
-            // dut->io_axi4ikskin_15_TDATA[m] = ikskaligned[15][i][j][k][l][m];
-            // dut->io_axi4ikskin_16_TDATA[m] = ikskaligned[16][i][j][k][l][m];
-            // dut->io_axi4ikskin_17_TDATA[m] = ikskaligned[17][i][j][k][l][m];
-            // dut->io_axi4ikskin_18_TDATA[m] = ikskaligned[18][i][j][k][l][m];
-            // dut->io_axi4ikskin_19_TDATA[m] = ikskaligned[19][i][j][k][l][m];
-          }
+          while(dut->io_axi4ikskin_0_TREADY==0) clock(dut, tfp);
+          memcpy(dut->io_axi4ikskin_0_TDATA, &ikskaligned[0][i][j][k][l][0], sizeof(uint32_t)*hbmbuswords);
+          memcpy(dut->io_axi4ikskin_1_TDATA, &ikskaligned[1][i][j][k][l][0], sizeof(uint32_t)*hbmbuswords);
+          memcpy(dut->io_axi4ikskin_2_TDATA, &ikskaligned[2][i][j][k][l][0], sizeof(uint32_t)*hbmbuswords);
+          memcpy(dut->io_axi4ikskin_3_TDATA, &ikskaligned[3][i][j][k][l][0], sizeof(uint32_t)*hbmbuswords);
+          memcpy(dut->io_axi4ikskin_4_TDATA, &ikskaligned[4][i][j][k][l][0], sizeof(uint32_t)*hbmbuswords);
+          memcpy(dut->io_axi4ikskin_5_TDATA, &ikskaligned[5][i][j][k][l][0], sizeof(uint32_t)*hbmbuswords);
+          memcpy(dut->io_axi4ikskin_6_TDATA, &ikskaligned[6][i][j][k][l][0], sizeof(uint32_t)*hbmbuswords);
+          memcpy(dut->io_axi4ikskin_7_TDATA, &ikskaligned[7][i][j][k][l][0], sizeof(uint32_t)*hbmbuswords);
+          memcpy(dut->io_axi4ikskin_8_TDATA, &ikskaligned[8][i][j][k][l][0], sizeof(uint32_t)*hbmbuswords);
+          memcpy(dut->io_axi4ikskin_9_TDATA, &ikskaligned[9][i][j][k][l][0], sizeof(uint32_t)*hbmbuswords);
           if(dut->io_ikskvalid){
-            for(int n = 0; n < buswords; n++){
-              reslvl0[buswords*outindex+n] = dut->io_ikskout[n];
-            }
+            memcpy(&reslvl0[wordsinbus*outindex], dut->io_ikskout, sizeof(uint32_t)*buswords);
             outindex++;
           }
           clock(dut, tfp);
@@ -362,16 +349,14 @@ int main(int argc, char** argv) {
   }
 
   while(dut->io_ikskvalid==1){
-  for(int n = 0; n < buswords; n++){
-            reslvl0[buswords*outindex+n] = dut->io_ikskout[n];
-          }
+  memcpy(&reslvl0[wordsinbus*outindex], dut->io_ikskout, sizeof(uint32_t)*buswords);
           outindex++;
   clock(dut, tfp);
   }
 
   for(int j = 0; j<=TFHEpp::lvl0param::n;j++){
-    uint32_t trueout = tlwelvl0[j];
-    uint32_t circout = reslvl0[j];
+    TFHEpp::lvl0param::T trueout = tlwelvl0[j];
+    TFHEpp::lvl0param::T circout = reslvl0[j];
     if(trueout != circout){
       std::cout<<"Error: "<<trueout<<":"<<circout<<std::endl;
       std::cout<<j<<std::endl;
