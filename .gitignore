@@ -9,3 +9,4 @@ emulation_debug.log
 vivado.log
 vivado.jou
 *.log.bak
+*.xclbin
