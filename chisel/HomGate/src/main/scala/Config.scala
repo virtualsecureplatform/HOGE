@@ -27,8 +27,8 @@ case class Config() {
     val changesizeslice = 6
     
     val iksknumbus = 10
-    val totaliksknumbus = 20
-    val iksknumsegments = totaliksknumbus/iksknumbus
+    val iksknumsegments = ((n + 1) + (iksknumbus * hbmbuswidth / qbit) - 1) / (iksknumbus * hbmbuswidth / qbit)
+    val totaliksknumbus = iksknumsegments * iksknumbus
 
     val axi4snumslice = 6
     val accnumslice = 8

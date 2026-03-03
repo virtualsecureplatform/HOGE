@@ -6,11 +6,13 @@
 #include <tfhe++.hpp>
 
   //allgned to distribute to module
-  constexpr uint iksknumbus = 10;
-  constexpr uint totaliksknumbus = 20;
   constexpr uint hbmbuswidthlb = 9;
   constexpr uint hbmbuswords = 1U<<(hbmbuswidthlb-5);
   constexpr uint hbmwordsinbus = (1U<<hbmbuswidthlb)/std::numeric_limits<typename TFHEpp::lvl0param::T>::digits;
+  constexpr uint iksknumbus = 10;
+  constexpr uint elementsPerSegment = iksknumbus * (1U << hbmbuswidthlb) / std::numeric_limits<typename TFHEpp::lvl0param::T>::digits;
+  constexpr uint iksknumsegments = (TFHEpp::lvl0param::n + elementsPerSegment) / elementsPerSegment;
+  constexpr uint totaliksknumbus = iksknumsegments * iksknumbus;
 
   constexpr uint radixbit = 5;
   constexpr uint radix = 1<<radixbit;
