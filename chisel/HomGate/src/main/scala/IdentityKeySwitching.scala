@@ -101,14 +101,17 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 	io.fin := false.B
 	io.axi4out.TVALID := false.B
 
-	val acc = SyncReadMem(conf.iksknumsegments,UInt((conf.hbmbuswidth*conf.iksknumbus).W))
+	val elementsPerBus = conf.hbmbuswidth / conf.qbit
+	val acc = for (k <- 0 until conf.iksknumbus) yield SyncReadMem(conf.iksknumsegments, UInt(conf.hbmbuswidth.W))
 	val accreadaddr = Wire(UInt(log2Ceil(conf.iksknumsegments).W))
-	val accreadport = acc(accreadaddr)
+	val accreadport = for (k <- 0 until conf.iksknumbus) yield acc(k).read(accreadaddr, true.B)
 	val accwriteaddr = Wire(UInt(log2Ceil(conf.iksknumsegments).W))
-	val accwriteport = acc(accwriteaddr)
-	val accbus = Wire(Vec(conf.iksknumbus*conf.hbmbuswidth/conf.qbit,UInt(conf.qbit.W)))
-	for(i <- 0 until conf.iksknumbus*conf.hbmbuswidth/conf.qbit){
-		accbus(i) := accreadport((i+1)*conf.qbit-1,i*conf.qbit)
+	val accwriteport = for (k <- 0 until conf.iksknumbus) yield acc(k)(accwriteaddr)
+	val accbus = Wire(Vec(conf.iksknumbus, Vec(elementsPerBus, UInt(conf.qbit.W))))
+	for (k <- 0 until conf.iksknumbus) {
+		for (j <- 0 until elementsPerBus) {
+			accbus(k)(j) := accreadport(k)((j+1)*conf.qbit-1, j*conf.qbit)
+		}
 	}
 	
 
@@ -124,10 +127,10 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 	val digitreg = RegInit(0.U(log2Ceil(conf.t).W))
 	val segreg = RegInit(0.U(log2Ceil(conf.iksknumsegments).W))
 	val outnum = ceil((conf.n+1)*conf.qbit.toFloat/conf.buswidth).toInt
-	val outbus = Wire(Vec(conf.iksknumbus*conf.hbmbuswidth/conf.buswidth,UInt(conf.buswidth.W)))
-	val outsegcount = RegInit(0.U(log2Ceil(conf.iksknumbus*conf.hbmbuswidth/conf.buswidth).W))
-	for(i <- 0 until conf.iksknumbus*conf.hbmbuswidth/conf.buswidth){
-		outbus(i) := accreadport((i+1)*conf.buswidth-1,i*conf.buswidth)
+	val outbus = Wire(Vec(conf.iksknumbus, UInt(conf.buswidth.W)))
+	val outsegcount = RegInit(0.U(log2Ceil(conf.iksknumbus).W))
+	for (k <- 0 until conf.iksknumbus) {
+		outbus(k) := accreadport(k)
 	}
 	val outdimreg = RegInit(0.U(log2Ceil(outnum).W))
 	accreadaddr := segreg
@@ -141,22 +144,31 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 		}
 		is(IdentityKeySwitchingState.INIT){
 			accwriteaddr := segreg
+			val totalElementsPerSegment = conf.iksknumbus * elementsPerBus
+			val bFlatIdx = conf.n - (conf.iksknumsegments - 1) * totalElementsPerSegment
+			val bBusIdx = bFlatIdx / elementsPerBus
+			val bLocalOffset = bFlatIdx % elementsPerBus
 			when(segreg =/= (conf.iksknumsegments-1).U){
 				segreg := segreg + 1.U
-				accwriteport := 0.U
+				for (k <- 0 until conf.iksknumbus) {
+					accwriteport(k) := 0.U
+				}
 			}.otherwise{
 				segreg := 0.U
-				val wireacc = Wire(Vec(conf.iksknumbus*conf.hbmbuswidth/conf.qbit,UInt(conf.qbit.W)))
-				for(i <- 0 until conf.iksknumbus*conf.hbmbuswidth/conf.qbit){
-					wireacc(i) := 0.U
+				for (k <- 0 until conf.iksknumbus) {
+					accwriteport(k) := 0.U
+				}
+				val wireacc = Wire(Vec(elementsPerBus, UInt(conf.qbit.W)))
+				for (j <- 0 until elementsPerBus) {
+					wireacc(j) := 0.U
 				}
 				if(conf.Qbit > conf.qbit)
-					wireacc(conf.n - (conf.iksknumsegments-1)*conf.hbmbuswidth*conf.iksknumbus/conf.qbit) := (io.b +& (1L << (conf.Qbit - conf.qbit - 1)).U) >> (conf.Qbit - conf.qbit)
+					wireacc(bLocalOffset) := (io.b +& (1L << (conf.Qbit - conf.qbit - 1)).U) >> (conf.Qbit - conf.qbit)
 				else
-					wireacc(conf.n - (conf.iksknumsegments-1)*conf.hbmbuswidth*conf.iksknumbus/conf.qbit) := io.b
-				accwriteport := Cat(wireacc.reverse)
+					wireacc(bLocalOffset) := io.b
+				accwriteport(bBusIdx) := Cat(wireacc.reverse)
 				statereg := IdentityKeySwitchingState.ADDRBUBBLE
-			}			
+			}
 		}
 		is(IdentityKeySwitchingState.ADDRBUBBLE){
 			statereg := IdentityKeySwitchingState.RUN
@@ -184,22 +196,28 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 				}
 			}
 			when(RegNext(io.axi4ikskin.TVALID)){
-				val wireacc = Wire(Vec(conf.hbmbuswidth*conf.iksknumbus/conf.qbit,UInt(conf.qbit.W)))
 				accwriteaddr := RegNext(accreadaddr)
-				for(i <- 0 until conf.hbmbuswidth*conf.iksknumbus/conf.qbit){
-					wireacc(i) := accbus(i) - RegNext(io.axi4ikskin.TDATA((i+1)*conf.qbit-1,i*conf.qbit))
+				for (k <- 0 until conf.iksknumbus) {
+					val wireacc = Wire(Vec(elementsPerBus, UInt(conf.qbit.W)))
+					for (j <- 0 until elementsPerBus) {
+						val flatIdx = k * elementsPerBus + j
+						wireacc(j) := accbus(k)(j) - RegNext(io.axi4ikskin.TDATA((flatIdx+1)*conf.qbit-1, flatIdx*conf.qbit))
+					}
+					accwriteport(k) := Cat(wireacc.reverse)
 				}
-				accwriteport := Cat(wireacc.reverse)
 			}
 		}
 		is(IdentityKeySwitchingState.LASTADD){
 			io.axi4ikskin.TREADY := true.B
-			val wireacc = Wire(Vec(conf.hbmbuswidth*conf.iksknumbus/conf.qbit,UInt(conf.qbit.W)))
 			accwriteaddr := RegNext(accreadaddr)
-			for(i <- 0 until conf.hbmbuswidth*conf.iksknumbus/conf.qbit){
-				wireacc(i) := accbus(i) - RegNext(io.axi4ikskin.TDATA((i+1)*conf.qbit-1,i*conf.qbit))
+			for (k <- 0 until conf.iksknumbus) {
+				val wireacc = Wire(Vec(elementsPerBus, UInt(conf.qbit.W)))
+				for (j <- 0 until elementsPerBus) {
+					val flatIdx = k * elementsPerBus + j
+					wireacc(j) := accbus(k)(j) - RegNext(io.axi4ikskin.TDATA((flatIdx+1)*conf.qbit-1, flatIdx*conf.qbit))
+				}
+				accwriteport(k) := Cat(wireacc.reverse)
 			}
-			accwriteport := Cat(wireacc.reverse)
 			statereg := IdentityKeySwitchingState.OUT
 		}
 		is(IdentityKeySwitchingState.OUT){
@@ -211,7 +229,7 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 				}.otherwise{
 					statereg := IdentityKeySwitchingState.LAST
 				}
-				when(outsegcount =/= (conf.iksknumbus*conf.hbmbuswidth/conf.buswidth-1).U){
+				when(outsegcount =/= (conf.iksknumbus-1).U){
 					outsegcount := outsegcount + 1.U
 				}.otherwise{
 					outsegcount := 0.U
