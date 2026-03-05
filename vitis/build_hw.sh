@@ -152,6 +152,7 @@ if [ ! -f "${XCLBIN_FILE}" ]; then
         --kernel_frequency 300 \
         --vivado.synth.jobs 8 \
         --vivado.impl.jobs 8 \
+        --vivado.prop "run.impl_1.{strategy}={Default}" \
         -o "${XCLBIN_FILE}" \
         "${XO_DIR}/HomGate.xo" \
         "${XO_DIR}/BRBack.xo" \

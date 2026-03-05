@@ -30,7 +30,7 @@ case class Config() {
     val iksknumsegments = ((n + 1) + (iksknumbus * hbmbuswidth / qbit) - 1) / (iksknumbus * hbmbuswidth / qbit)
     val totaliksknumbus = iksknumsegments * iksknumbus
 
-    val axi4snumslice = 6
+    val axi4snumslice = 8
     val accnumslice = 8
     val interslr = 8
 
