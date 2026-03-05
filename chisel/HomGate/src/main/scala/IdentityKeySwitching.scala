@@ -297,15 +297,17 @@ class AXISIKS(implicit val conf:Config) extends Module{
 	val addrreg = RegInit(1.U(conf.basebit.W))
 	val added = RegInit(false.B)
 	val segreg = RegInit(0.U(log2Ceil(conf.iksknumsegments).W))
+	val addrPipe = RegNext(IKS.io.addr)
+	val wrapBubble = RegInit(false.B)
 
-	when(Cat(tvalidvec).andR && IKS.io.axi4ikskin.TREADY){
+	when(Cat(tvalidvec).andR && IKS.io.axi4ikskin.TREADY && ~wrapBubble){
 		treadywire := IKS.io.axi4ikskin.TREADY
 		when(~added){
-			when(IKS.io.addr===0.U){
+			when(addrPipe===0.U){
 				IKS.io.axi4ikskin.TDATA := 0.U
 				IKS.io.axi4ikskin.TVALID := true.B
 				added := segreg === (conf.iksknumsegments-1).U
-			}.elsewhen(IKS.io.addr===addrreg){
+			}.elsewhen(addrPipe===addrreg){
 				IKS.io.axi4ikskin.TVALID := true.B
 				added := segreg === (conf.iksknumsegments-1).U
 			}
@@ -319,7 +321,11 @@ class AXISIKS(implicit val conf:Config) extends Module{
 			}.otherwise{
 				addrreg := 1.U
 				added := false.B
+				wrapBubble := true.B
 			}
 		}
+	}
+	when(wrapBubble){
+		wrapBubble := false.B
 	}
 }
