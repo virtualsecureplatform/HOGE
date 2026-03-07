@@ -75,11 +75,13 @@ int main(int argc, char* argv[]) {
 	constexpr uint buswidthlb = 9;
 	constexpr uint buswords = 1U<<(buswidthlb-6);
 	constexpr uint iksknumbus = 10;
-	constexpr uint totaliksknumbus = 40;
+	constexpr uint wordsinbus = (1U<<buswidthlb)/std::numeric_limits<typename TFHEpp::lvl0param::T>::digits;
+	constexpr uint elementsPerSegment = iksknumbus * wordsinbus;
+	constexpr uint iksknumsegments = (TFHEpp::lvl0param::n + elementsPerSegment) / elementsPerSegment;
+	constexpr uint totaliksknumbus = iksknumsegments * iksknumbus;
 	constexpr uint bknumbus = 8;
 	constexpr uint cyclebit = 5;
 	constexpr uint numcycle = 1<<cyclebit;
-	constexpr uint wordsinbus = (1U<<buswidthlb)/std::numeric_limits<typename TFHEpp::lvl0param::T>::digits;
 
   	alignas(4096) std::array<std::array<std::array<std::array<std::array<std::array<typename TFHEpp::lvl0param::T, wordsinbus>, totaliksknumbus/iksknumbus>, (1 << TFHEpp::lvl10param::basebit) - 1>, TFHEpp::lvl10param::t>,TFHEpp::lvl1param::n>,iksknumbus> ikskaligned = {},ikskdebug = {};
   	for(int i = 0; i<TFHEpp::lvl1param::n; i++) for(int j = 0; j < TFHEpp::lvl10param::t; j++) for(int k = 0; k< (1 << TFHEpp::lvl10param::basebit) - 1; k++) for(int l = 0; l < wordsinbus; l++) for(int m = 0; m < iksknumbus; m++) for(int n = 0; n < totaliksknumbus/iksknumbus; n++) ikskaligned[m][i][j][k][n][l] = (*iksk)[i][j][k][n*iksknumbus*wordsinbus+m*wordsinbus+l];
