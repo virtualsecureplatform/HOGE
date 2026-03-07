@@ -92,6 +92,64 @@ class Decomposition(implicit val conf:Config) extends Module{
     }
 }
 
+class TRGSWBatchMemory(implicit val conf:Config) extends Module{
+    val io = IO(new Bundle{
+        val trgswin = Input(Vec(conf.radix,UInt(64.W)))
+        val trgswinvalid = Input(Bool())
+        val trgswinready = Output(Bool())
+        val trgswout = Output(Vec(conf.radix,UInt(64.W)))
+        val trgswoutvalid = Output(Bool())
+        val trgswoutready = Input(Bool())
+    })
+
+    val depth = 2*conf.l*conf.numcycle
+    val width = conf.radix * 64
+
+    val mem = Module(new RWDmem(2*depth, width))
+    mem.io.in := Cat(io.trgswin.reverse)
+    for(k <- 0 until conf.radix){
+        io.trgswout(k) := mem.io.out((k+1)*64-1, k*64)
+    }
+
+    val incnt = RegInit(0.U(log2Ceil(depth+1).W))
+    val inselreg = RegInit(0.U(1.W))
+    val outcnt = RegInit(0.U(log2Ceil(depth).W))
+    val outselreg = RegInit(0.U(1.W))
+    val batchcnt = RegInit(0.U(log2Ceil(conf.numbatch).W))
+
+    io.trgswinready := (inselreg =/= outselreg || (outcnt <= incnt && batchcnt === 0.U)) && incnt =/= depth.U
+    mem.io.wen := io.trgswinready && io.trgswinvalid
+    mem.io.waddr := incnt + inselreg * depth.U
+
+    io.trgswoutvalid := outcnt < incnt || inselreg =/= outselreg
+    mem.io.raddr := outcnt + outselreg * depth.U
+
+    when(mem.io.wen){
+        incnt := incnt + 1.U
+    }
+    when(incnt === depth.U && inselreg === outselreg){
+        inselreg := ~inselreg
+        incnt := 0.U
+    }
+
+    when(io.trgswoutvalid && io.trgswoutready){
+        when(outcnt =/= (depth-1).U){
+            mem.io.raddr := outcnt + 1.U + outselreg * depth.U
+            outcnt := outcnt + 1.U
+        }.otherwise{
+            mem.io.raddr := outselreg * depth.U
+            outcnt := 0.U
+            when(batchcnt =/= (conf.numbatch - 1).U){
+                batchcnt := batchcnt + 1.U
+            }.otherwise{
+                batchcnt := 0.U
+                outselreg := ~outselreg
+                mem.io.raddr := (~outselreg) * depth.U
+            }
+        }
+    }
+}
+
 object MULandACCState extends ChiselEnum {
   val RUN, DELAY, OUT = Value
 }
@@ -105,11 +163,17 @@ class MULandACCpolynomial(delay: Int,implicit val conf:Config) extends Module{
         val trgswinready = Output(Bool())
         val validin = Input(Bool())
         val validout = Output(Bool())
-        
+
         val debugvalid = Output(Bool())
         val debugout = Output(UInt((conf.block*64).W))
 	})
-    io.trgswinready := false.B
+
+    // TRGSWBatchMemory for BK replay
+    val trgswbatchmem = Module(new TRGSWBatchMemory)
+    trgswbatchmem.io.trgswin := io.trgswin
+    trgswbatchmem.io.trgswinvalid := io.trgswinvalid
+    io.trgswinready := trgswbatchmem.io.trgswinready
+    trgswbatchmem.io.trgswoutready := false.B
 
     val accmem = Module(new AccumulateMemory(conf.numcycle,conf.block*64, conf))
 
@@ -126,7 +190,7 @@ class MULandACCpolynomial(delay: Int,implicit val conf:Config) extends Module{
     for(k <- 0 until conf.radix){
         val mul = Module(new INTorusMUL)
         mul.io.A := io.in((k+1)*64-1,k*64)
-        mul.io.B := io.trgswin(k)
+        mul.io.B := trgswbatchmem.io.trgswout(k)
         val add = Module(new INTorusADD)
         add.io.A := RegNext(mul.io.Y)
         add.io.B := RegNext(Mux(ShiftRegister(digitreg===0.U,conf.muldelay),0.U,ShiftRegister(accmem.io.out((k+1)*64-1,k*64),conf.muldelay-1)))
@@ -143,8 +207,8 @@ class MULandACCpolynomial(delay: Int,implicit val conf:Config) extends Module{
 
     switch(statereg){
         is(MULandACCState.RUN){
-            when(io.validin && io.trgswinvalid){
-                io.trgswinready := true.B
+            when(io.validin && trgswbatchmem.io.trgswoutvalid){
+                trgswbatchmem.io.trgswoutready := true.B
                 wenwire := true.B
                 when(digitreg=/=0.U){
                     accmem.io.rreq := true.B

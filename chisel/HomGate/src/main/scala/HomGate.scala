@@ -99,9 +99,9 @@ class HomGateTop(implicit val conf:Config) extends Module{
 	io.axi4inacmd.TVALID := false.B
 	io.axi4inbcmd.TVALID := false.B
 
-	io.axi4outcmd.TDATA:=Cat(io.outaddr,false.B,true.B,0.U(6.W),true.B,ceil(conf.Qbit*(conf.N+1).toFloat/8).toInt.U(23.W))
-	io.axi4inacmd.TDATA:=Cat(io.inaaddr,false.B,true.B,0.U(6.W),true.B,ceil(conf.Qbit*(conf.N+1).toFloat/8).toInt.U(23.W))
-	io.axi4inbcmd.TDATA:=Cat(io.inbaddr,false.B,true.B,0.U(6.W),true.B,ceil(conf.Qbit*(conf.N+1).toFloat/8).toInt.U(23.W))
+	io.axi4outcmd.TDATA:=Cat(io.outaddr,false.B,true.B,0.U(6.W),true.B,ceil(conf.Qbit*(conf.N+1).toFloat*conf.numbatch/8).toInt.U(23.W))
+	io.axi4inacmd.TDATA:=Cat(io.inaaddr,false.B,true.B,0.U(6.W),true.B,ceil(conf.Qbit*(conf.N+1).toFloat*conf.numbatch/8).toInt.U(23.W))
+	io.axi4inbcmd.TDATA:=Cat(io.inbaddr,false.B,true.B,0.U(6.W),true.B,ceil(conf.Qbit*(conf.N+1).toFloat*conf.numbatch/8).toInt.U(23.W))
 	for(i <- 0 until conf.iksknumbus){
 		io.axi4ikskincmd(i).TVALID := false.B
 		io.axi4ikskincmd(i).TDATA:=Cat(io.ikskaddr(i),false.B,true.B,0.U(6.W),true.B,(conf.hbmbuswidth*(conf.totaliksknumbus/conf.iksknumbus)*((1<<conf.basebit)-1)*conf.t*conf.N/8).U(23.W))
@@ -221,10 +221,16 @@ class HomGateWrap(implicit val conf:Config) extends Module{
 
 		val ikskout = Output(UInt(conf.buswidth.W))
 		val ikskvalid = Output(Bool())
+		val ikskready = Output(Bool())
 		val debugadd = Output(UInt(conf.buswidth.W))
 		val debugout = Output(UInt((conf.block*conf.Qbit).W))
 		val debugvalid = Output(Bool())
 		val debug_iksenable = Output(Bool())
+		val debug_loadstate = Output(UInt(2.W))
+		val debug_batchloadcnt = Output(UInt(log2Ceil(conf.numbatch).W))
+		val debug_tlwevalidout = Output(Bool())
+		val debug_bvalue = Output(UInt(conf.Qbit.W))
+		val debug_a0value = Output(UInt(conf.Qbit.W))
 	})
 
 	val homnand = Module(new HomGateTop)
@@ -272,8 +278,14 @@ class HomGateWrap(implicit val conf:Config) extends Module{
 	globalinsliceSLR1toSLR2.io.manager <> axisbrformer.io.axi4sglobalin
 	io.ikskout := axisiks.io.axi4out.TDATA
 	io.ikskvalid := axisiks.io.axi4out.TVALID
+	io.ikskready := axisiks.io.axi4out.TREADY
 	axisiks.io.axi4ikskin <> io.axi4ikskin
 	io.debug_iksenable := axisiks.io.debug_iksenable
+	io.debug_loadstate := axisiks.io.debug_loadstate
+	io.debug_batchloadcnt := axisiks.io.debug_batchloadcnt
+	io.debug_tlwevalidout := axisiks.io.debug_tlwevalidout
+	io.debug_bvalue := axisiks.io.debug_bvalue
+	io.debug_a0value := axisiks.io.debug_a0value
 
 	axisbrformer.io.axi4sglobalout <> globaloutsliceSLR2toSLR1.io.subordinate
 	globaloutsliceSLR2toSLR1.io.manager <> globaloutsliceSLR1toSLR0.io.subordinate
