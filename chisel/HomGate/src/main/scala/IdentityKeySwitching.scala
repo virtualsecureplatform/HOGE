@@ -23,25 +23,34 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 	io.fin := false.B
 	io.axi4out.TVALID := false.B
 
-	// numbatch accumulators
-	val accs = for (i <- 0 until conf.numbatch) yield
-		SyncReadMem(conf.iksknumsegments, UInt((conf.hbmbuswidth*conf.iksknumbus).W))
+	val elementsPerBus = conf.hbmbuswidth / conf.qbit
+
+	// numbatch × iksknumbus sub-accumulators
+	val accs = for (b <- 0 until conf.numbatch) yield
+		for (k <- 0 until conf.iksknumbus) yield
+			SyncReadMem(conf.iksknumsegments, UInt(conf.hbmbuswidth.W))
 
 	val accreadaddr = Wire(UInt(log2Ceil(conf.iksknumsegments).W))
 	val accwriteaddr = Wire(UInt(log2Ceil(conf.iksknumsegments).W))
 	accwriteaddr := DontCare
 
-	// Read from all accumulators simultaneously
-	val accreaddata = Wire(Vec(conf.numbatch, UInt((conf.hbmbuswidth*conf.iksknumbus).W)))
-	for (i <- 0 until conf.numbatch) {
-		accreaddata(i) := accs(i).read(accreadaddr)
-	}
+	// Read ports (per batch, per bus)
+	val accreadport = for (b <- 0 until conf.numbatch) yield
+		for (k <- 0 until conf.iksknumbus) yield
+			accs(b)(k).read(accreadaddr, true.B)
 
-	// Split read data into qbit-width elements per batch
-	val accbus = Wire(Vec(conf.numbatch, Vec(conf.hbmbuswidth*conf.iksknumbus/conf.qbit, UInt(conf.qbit.W))))
+	// Write ports (per batch, per bus)
+	val accwriteport = for (b <- 0 until conf.numbatch) yield
+		for (k <- 0 until conf.iksknumbus) yield
+			accs(b)(k)(accwriteaddr)
+
+	// Split read data into qbit-width elements per batch, per bus
+	val accbus = Wire(Vec(conf.numbatch, Vec(conf.iksknumbus, Vec(elementsPerBus, UInt(conf.qbit.W)))))
 	for (b <- 0 until conf.numbatch) {
-		for (i <- 0 until conf.hbmbuswidth*conf.iksknumbus/conf.qbit) {
-			accbus(b)(i) := accreaddata(b)((i+1)*conf.qbit-1, i*conf.qbit)
+		for (k <- 0 until conf.iksknumbus) {
+			for (j <- 0 until elementsPerBus) {
+				accbus(b)(k)(j) := accreadport(b)(k)((j+1)*conf.qbit-1, j*conf.qbit)
+			}
 		}
 	}
 
@@ -59,9 +68,14 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 
 	// Output state
 	val outnum = ceil((conf.n+1)*conf.qbit.toFloat/conf.buswidth).toInt
-	val outsegcount = RegInit(0.U(log2Ceil(conf.iksknumbus*conf.hbmbuswidth/conf.buswidth).W))
+	val outbus = Wire(Vec(conf.iksknumbus, UInt(conf.buswidth.W)))
+	val outsegcount = RegInit(0.U(log2Ceil(conf.iksknumbus).W))
 	val outdimreg = RegInit(0.U(log2Ceil(outnum).W))
 	val batchoutreg = RegInit(0.U(log2Ceil(conf.numbatch).W))
+	val accreadportVec = VecInit(for (b <- 0 until conf.numbatch) yield VecInit(for (k <- 0 until conf.iksknumbus) yield accreadport(b)(k)))
+	for (k <- 0 until conf.iksknumbus) {
+		outbus(k) := accreadportVec(batchoutreg)(k)
+	}
 
 	// Compute decomposed address for all batches
 	val decomp = Wire(Vec(conf.numbatch, UInt(conf.basebit.W)))
@@ -73,15 +87,15 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 		decomp(b) := decompbus(digitreg)
 	}
 
-	// Output bus (selects from the batch being output)
-	val outbus = Wire(Vec(conf.iksknumbus*conf.hbmbuswidth/conf.buswidth, UInt(conf.buswidth.W)))
-	for (i <- 0 until conf.iksknumbus*conf.hbmbuswidth/conf.buswidth) {
-		outbus(i) := accreaddata(batchoutreg)((i+1)*conf.buswidth-1, i*conf.buswidth)
-	}
-
 	io.dimidx := dimreg
 	io.axi4out.TDATA := outbus(outsegcount)
 	accreadaddr := segreg
+
+	// b-value placement constants
+	val totalElementsPerSegment = conf.iksknumbus * elementsPerBus
+	val bFlatIdx = conf.n - (conf.iksknumsegments - 1) * totalElementsPerSegment
+	val bBusIdx = bFlatIdx / elementsPerBus
+	val bLocalOffset = bFlatIdx % elementsPerBus
 
 	switch(statereg) {
 		is(IdentityKeySwitchingState.WAIT) {
@@ -93,16 +107,26 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 			// Initialize all accumulators in parallel
 			for (b <- 0 until conf.numbatch) {
 				when(segreg =/= (conf.iksknumsegments-1).U) {
-					accs(b).write(segreg, 0.U)
-				}.otherwise {
-					val wireacc = Wire(Vec(conf.iksknumbus*conf.hbmbuswidth/conf.qbit, UInt(conf.qbit.W)))
-					for (i <- 0 until conf.iksknumbus*conf.hbmbuswidth/conf.qbit) {
-						wireacc(i) := 0.U
+					for (k <- 0 until conf.iksknumbus) {
+						accwriteport(b)(k) := 0.U
 					}
-					wireacc(conf.n - (conf.iksknumsegments-1)*conf.hbmbuswidth*conf.iksknumbus/conf.qbit) := io.b(b)
-					accs(b).write(segreg, Cat(wireacc.reverse))
+				}.otherwise {
+					for (k <- 0 until conf.iksknumbus) {
+						accwriteport(b)(k) := 0.U
+					}
+					// Place b value in the correct bus and position
+					val wireacc = Wire(Vec(elementsPerBus, UInt(conf.qbit.W)))
+					for (j <- 0 until elementsPerBus) {
+						wireacc(j) := 0.U
+					}
+					if(conf.Qbit > conf.qbit)
+						wireacc(bLocalOffset) := (io.b(b) +& (1L << (conf.Qbit - conf.qbit - 1)).U) >> (conf.Qbit - conf.qbit)
+					else
+						wireacc(bLocalOffset) := io.b(b)
+					accwriteport(b)(bBusIdx) := Cat(wireacc.reverse)
 				}
 			}
+			accwriteaddr := segreg
 			when(segreg =/= (conf.iksknumsegments-1).U) {
 				segreg := segreg + 1.U
 			}.otherwise {
@@ -158,13 +182,16 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 			when(RegNext(io.axi4ikskin.TVALID && dimbubblecnt === 0.U && statereg === IdentityKeySwitchingState.RUN)) {
 				accwriteaddr := RegNext(accreadaddr)
 				for (b <- 0 until conf.numbatch) {
-					val wireacc = Wire(Vec(conf.hbmbuswidth*conf.iksknumbus/conf.qbit, UInt(conf.qbit.W)))
-					for (i <- 0 until conf.hbmbuswidth*conf.iksknumbus/conf.qbit) {
-						wireacc(i) := Mux(RegNext(decomp(b) === addrreg),
-							accbus(b)(i) - RegNext(io.axi4ikskin.TDATA((i+1)*conf.qbit-1, i*conf.qbit)),
-							accbus(b)(i))
+					for (k <- 0 until conf.iksknumbus) {
+						val wireacc = Wire(Vec(elementsPerBus, UInt(conf.qbit.W)))
+						for (j <- 0 until elementsPerBus) {
+							val flatIdx = k * elementsPerBus + j
+							wireacc(j) := Mux(RegNext(decomp(b) === addrreg),
+								accbus(b)(k)(j) - RegNext(io.axi4ikskin.TDATA((flatIdx+1)*conf.qbit-1, flatIdx*conf.qbit)),
+								accbus(b)(k)(j))
+						}
+						accwriteport(b)(k) := Cat(wireacc.reverse)
 					}
-					accs(b).write(accwriteaddr, Cat(wireacc.reverse))
 				}
 			}
 		}
@@ -172,13 +199,16 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 			// Catch the last writeback from the final RUN cycle
 			accwriteaddr := RegNext(accreadaddr)
 			for (b <- 0 until conf.numbatch) {
-				val wireacc = Wire(Vec(conf.hbmbuswidth*conf.iksknumbus/conf.qbit, UInt(conf.qbit.W)))
-				for (i <- 0 until conf.hbmbuswidth*conf.iksknumbus/conf.qbit) {
-					wireacc(i) := Mux(RegNext(decomp(b) === addrreg),
-						accbus(b)(i) - RegNext(io.axi4ikskin.TDATA((i+1)*conf.qbit-1, i*conf.qbit)),
-						accbus(b)(i))
+				for (k <- 0 until conf.iksknumbus) {
+					val wireacc = Wire(Vec(elementsPerBus, UInt(conf.qbit.W)))
+					for (j <- 0 until elementsPerBus) {
+						val flatIdx = k * elementsPerBus + j
+						wireacc(j) := Mux(RegNext(decomp(b) === addrreg),
+							accbus(b)(k)(j) - RegNext(io.axi4ikskin.TDATA((flatIdx+1)*conf.qbit-1, flatIdx*conf.qbit)),
+							accbus(b)(k)(j))
+					}
+					accwriteport(b)(k) := Cat(wireacc.reverse)
 				}
-				accs(b).write(accwriteaddr, Cat(wireacc.reverse))
 			}
 			statereg := IdentityKeySwitchingState.OUT
 		}
@@ -199,12 +229,12 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 					}
 				}.otherwise {
 					outdimreg := outdimreg + 1.U
-					when(outsegcount === (conf.iksknumbus*conf.hbmbuswidth/conf.buswidth-1).U) {
+					when(outsegcount =/= (conf.iksknumbus-1).U) {
+						outsegcount := outsegcount + 1.U
+					}.otherwise {
 						outsegcount := 0.U
 						accreadaddr := segreg + 1.U
 						segreg := segreg + 1.U
-					}.otherwise {
-						outsegcount := outsegcount + 1.U
 					}
 				}
 			}

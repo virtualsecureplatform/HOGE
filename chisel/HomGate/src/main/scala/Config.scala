@@ -17,7 +17,7 @@ case class Config() {
     val t = 7
     val basebit = 2
     val Qbit = 32
-    val qbit = 32
+    val qbit = 16
     val mu = 1<<29
 
     // implementation specific parameters
@@ -29,10 +29,10 @@ case class Config() {
     val changesizeslice = 6
     
     val iksknumbus = 10
-    val totaliksknumbus = 40
-    val iksknumsegments = totaliksknumbus/iksknumbus
+    val iksknumsegments = ((n + 1) + (iksknumbus * hbmbuswidth / qbit) - 1) / (iksknumbus * hbmbuswidth / qbit)
+    val totaliksknumbus = iksknumsegments * iksknumbus
 
-    val axi4snumslice = 6
+    val axi4snumslice = 8
     val accnumslice = 8
     val interslr = 8
 
