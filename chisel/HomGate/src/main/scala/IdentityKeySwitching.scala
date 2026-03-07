@@ -55,8 +55,12 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 	}
 
 	// Address decomposition (inline, for all batches)
+	// Koga's optimization: offset + roundoffset added to a, then decomp - halfbase gives signed digit
 	val areg = Reg(Vec(conf.numbatch, UInt(conf.Qbit.W)))
-	val roundoffset = 1L<<(conf.Qbit - conf.t*conf.basebit - 1)
+	val roundoffset:Long = if (conf.basebit * conf.t < conf.Qbit) 1L<<(conf.Qbit - conf.t*conf.basebit - 1) else 0L
+	val halfbase = 1 << (conf.basebit - 1)
+	val iksoffset:Long = (1 to conf.t).map(i => (1L << (conf.basebit - 1)) * (1L << (conf.Qbit - i*conf.basebit))).sum & ((1L << conf.Qbit) - 1)
+	val combinedoffset:Long = (iksoffset + roundoffset) & ((1L << conf.Qbit) - 1)
 
 	// State machine
 	val statereg = RegInit(IdentityKeySwitchingState.WAIT)
@@ -77,12 +81,13 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 		outbus(k) := accreadportVec(batchoutreg)(k)
 	}
 
-	// Compute decomposed address for all batches
+	// Compute decomposed address for all batches (with Koga's offset)
 	val decomp = Wire(Vec(conf.numbatch, UInt(conf.basebit.W)))
 	for (b <- 0 until conf.numbatch) {
+		val aibar = areg(b) + combinedoffset.U(conf.Qbit.W)
 		val decompbus = Wire(Vec(conf.t, UInt(conf.basebit.W)))
 		for (i <- 0 until conf.t) {
-			decompbus(i) := (areg(b) + roundoffset.U)(conf.Qbit - i*conf.basebit - 1, conf.Qbit - (i+1)*conf.basebit)
+			decompbus(i) := aibar(conf.Qbit - i*conf.basebit - 1, conf.Qbit - (i+1)*conf.basebit)
 		}
 		decomp(b) := decompbus(digitreg)
 	}
@@ -158,7 +163,7 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 						segreg := segreg + 1.U
 					}.otherwise {
 						segreg := 0.U
-						when(addrreg =/= ((1<<conf.basebit)-1).U) {
+						when(addrreg =/= halfbase.U) {
 							addrreg := addrreg + 1.U
 						}.otherwise {
 							addrreg := 1.U
@@ -178,17 +183,22 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 					}
 				}
 			}
-			// Writeback (1 cycle delayed read-modify-write)
+			// Writeback (1 cycle delayed read-modify-write) with Koga's signed decomposition
 			when(RegNext(io.axi4ikskin.TVALID && dimbubblecnt === 0.U && statereg === IdentityKeySwitchingState.RUN)) {
 				accwriteaddr := RegNext(accreadaddr)
 				for (b <- 0 until conf.numbatch) {
+					// Koga's: decomp - halfbase gives signed digit
+					// decomp == halfbase + addr → positive → subtract
+					// decomp == halfbase - addr → negative → add
+					val doSub = RegNext(decomp(b) === (halfbase.U +& addrreg))
+					val doAdd = RegNext(decomp(b) === (halfbase.U - addrreg))
 					for (k <- 0 until conf.iksknumbus) {
 						val wireacc = Wire(Vec(elementsPerBus, UInt(conf.qbit.W)))
 						for (j <- 0 until elementsPerBus) {
 							val flatIdx = k * elementsPerBus + j
-							wireacc(j) := Mux(RegNext(decomp(b) === addrreg),
-								accbus(b)(k)(j) - RegNext(io.axi4ikskin.TDATA((flatIdx+1)*conf.qbit-1, flatIdx*conf.qbit)),
-								accbus(b)(k)(j))
+							val ikskdata = RegNext(io.axi4ikskin.TDATA((flatIdx+1)*conf.qbit-1, flatIdx*conf.qbit))
+							wireacc(j) := Mux(doSub, accbus(b)(k)(j) - ikskdata,
+								Mux(doAdd, accbus(b)(k)(j) + ikskdata, accbus(b)(k)(j)))
 						}
 						accwriteport(b)(k) := Cat(wireacc.reverse)
 					}
@@ -199,13 +209,15 @@ class IdentityKeySwitching(implicit val conf:Config) extends Module{
 			// Catch the last writeback from the final RUN cycle
 			accwriteaddr := RegNext(accreadaddr)
 			for (b <- 0 until conf.numbatch) {
+				val doSub = RegNext(decomp(b) === (halfbase.U +& addrreg))
+				val doAdd = RegNext(decomp(b) === (halfbase.U - addrreg))
 				for (k <- 0 until conf.iksknumbus) {
 					val wireacc = Wire(Vec(elementsPerBus, UInt(conf.qbit.W)))
 					for (j <- 0 until elementsPerBus) {
 						val flatIdx = k * elementsPerBus + j
-						wireacc(j) := Mux(RegNext(decomp(b) === addrreg),
-							accbus(b)(k)(j) - RegNext(io.axi4ikskin.TDATA((flatIdx+1)*conf.qbit-1, flatIdx*conf.qbit)),
-							accbus(b)(k)(j))
+						val ikskdata = RegNext(io.axi4ikskin.TDATA((flatIdx+1)*conf.qbit-1, flatIdx*conf.qbit))
+						wireacc(j) := Mux(doSub, accbus(b)(k)(j) - ikskdata,
+							Mux(doAdd, accbus(b)(k)(j) + ikskdata, accbus(b)(k)(j)))
 					}
 					accwriteport(b)(k) := Cat(wireacc.reverse)
 				}

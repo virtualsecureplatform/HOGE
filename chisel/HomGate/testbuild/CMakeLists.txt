@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(HomGateTest CXX)
+project(HomGateTest C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_FLAGS "-march=native -O3 -g")
 

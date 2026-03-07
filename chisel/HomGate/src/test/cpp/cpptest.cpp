@@ -73,16 +73,17 @@ int main(int argc, char** argv) {
 
   using alignedTLWElvl0 = std::array<TFHEpp::lvl0param::T,alignedlenlvl0>;
 
-  std::array<std::array<std::array<std::array<std::array<std::array<typename TFHEpp::lvl0param::T, hbmwordsinbus>, totaliksknumbus/iksknumbus>, (1 << TFHEpp::lvl10param::basebit) - 1>, TFHEpp::lvl10param::t>,TFHEpp::lvl1param::n>, iksknumbus> ikskaligned = {};
-  for(int i = 0; i<TFHEpp::lvl1param::n; i++) for(int j = 0; j < TFHEpp::lvl10param::t; j++) for(int k = 0; k< (1 << TFHEpp::lvl10param::basebit) - 1; k++) for(int l = 0; l < hbmwordsinbus; l++) for(int m = 0; m < iksknumbus; m++) for(int n = 0; n < totaliksknumbus/iksknumbus; n++) { int idx = n*iksknumbus*hbmwordsinbus+m*hbmwordsinbus+l; if(idx <= TFHEpp::lvl0param::n) ikskaligned[m][i][j][k][n][l] = (*iksk)[i][j][k][idx]; }
+  std::array<std::array<std::array<std::array<std::array<std::array<typename TFHEpp::lvl0param::T, hbmwordsinbus>, totaliksknumbus/iksknumbus>, 1 << (TFHEpp::lvl10param::basebit - 1)>, TFHEpp::lvl10param::t>,TFHEpp::lvl1param::n>, iksknumbus> ikskaligned = {};
+  for(int i = 0; i<TFHEpp::lvl1param::n; i++) for(int j = 0; j < TFHEpp::lvl10param::t; j++) for(int k = 0; k< 1 << (TFHEpp::lvl10param::basebit - 1); k++) for(int l = 0; l < hbmwordsinbus; l++) for(int m = 0; m < iksknumbus; m++) for(int n = 0; n < totaliksknumbus/iksknumbus; n++) { int idx = n*iksknumbus*hbmwordsinbus+m*hbmwordsinbus+l; if(idx <= TFHEpp::lvl0param::n) ikskaligned[m][i][j][k][n][l] = (*iksk)[i][j][k][idx]; }
 
   constexpr uint alignedlenlvl1 = (((std::numeric_limits<TFHEpp::lvl1param::T>::digits*(TFHEpp::lvl1param::n+1)>>buswidthlb)+1)<<buswidthlb)/std::numeric_limits<TFHEpp::lvl1param::T>::digits;
   using alignedTLWElvl1 = std::array<TFHEpp::lvl1param::T,alignedlenlvl1>;
 
   const bool pa = (binary(engine) > 0);
   const bool pb = (binary(engine) > 0);
-  TFHEpp::TLWE<TFHEpp::lvl1param> tlwea = TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(pa,TFHEpp::lvl1param::α,sk->key.lvl1);
-  TFHEpp::TLWE<TFHEpp::lvl1param> tlweb = TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(pb,TFHEpp::lvl1param::α,sk->key.lvl1);
+  TFHEpp::TLWE<TFHEpp::lvl1param> tlwea, tlweb;
+  TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlwea, pa ? TFHEpp::lvl1param::μ : -TFHEpp::lvl1param::μ, TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
+  TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlweb, pb ? TFHEpp::lvl1param::μ : -TFHEpp::lvl1param::μ, TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
   TFHEpp::TLWE<TFHEpp::lvl1param> res,tlwelvl1;
   //AND
   for(int l = 0; l<= TFHEpp::lvl1param::n; l++) tlwelvl1[l] = tlwea[l] + tlweb[l];
@@ -257,7 +258,7 @@ int main(int argc, char** argv) {
   uint outindex = 0;
   for(int i = 0; i<TFHEpp::lvl1param::n;i++)
     for(int j = 0; j<TFHEpp::lvl10param::t;j++)
-      for(int k=0;k<(1<<TFHEpp::lvl10param::basebit)-1;k++){
+      for(int k=0;k<1<<(TFHEpp::lvl10param::basebit-1);k++){
         for(int l = 0; l < totaliksknumbus/iksknumbus; l++){
           while(dut->io_axi4ikskin_0_TREADY==0) clock(dut, tfp);
           memcpy(dut->io_axi4ikskin_0_TDATA, ikskaligned[0][i][j][k][l].data(), hbmbuswords*sizeof(uint32_t));
@@ -350,7 +351,7 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
   TFHEpp::PolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(pmbx[1],brres[1],ā);
 
   // Software CMUX update (compute post-CMUX brres)
-  TFHEpp::CMUXNTTwithPolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(
+  TFHEpp::CMUXwithPolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(
       brres, (*bkntt)[i], ā);
 
   // Check debug output for each batch
