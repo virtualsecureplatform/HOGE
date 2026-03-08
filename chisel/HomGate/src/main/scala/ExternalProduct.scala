@@ -152,10 +152,6 @@ class TRGSWBatchMemory(implicit val conf:Config) extends Module{
     }
 }
 
-object MULandACCState extends ChiselEnum {
-  val RUN, DELAY, OUT = Value
-}
-
 class MULandACCpolynomial(delay: Int,implicit val conf:Config) extends Module{
     val io = IO(new Bundle{
 		val in = Input(UInt((conf.block*64).W))
@@ -177,10 +173,7 @@ class MULandACCpolynomial(delay: Int,implicit val conf:Config) extends Module{
     io.trgswinready := trgswbatchmem.io.trgswinready
     trgswbatchmem.io.trgswoutready := false.B
 
-    val accmem = Module(new AccumulateMemory(conf.numcycle,conf.block*64, conf))
-
     val cyclereg = RegInit(0.U(conf.cyclebit.W))
-    io.out := accmem.io.out
     val digitreg = RegInit(0.U(log2Ceil((conf.k+1)*conf.l).W))
     val wenwire = Wire(Bool())
     val validwire = Wire(Bool())
@@ -188,66 +181,72 @@ class MULandACCpolynomial(delay: Int,implicit val conf:Config) extends Module{
     validwire := false.B
     io.validout := RegNext(validwire)
 
+    // ShiftRegister-based accumulation (replaces AccumulateMemory)
     val accbus = Wire(Vec(conf.fiber,UInt(64.W)))
+    val outwire = Wire(UInt((conf.block*64).W))
+    outwire := ShiftRegister(Cat(accbus.reverse), conf.numcycle*(delay+1) - conf.muldelay - 2)
+
     for(k <- 0 until conf.radix){
         val mul = Module(new INTorusMUL)
         mul.io.A := io.in((k+1)*64-1,k*64)
         mul.io.B := trgswbatchmem.io.trgswout(k)
         val add = Module(new INTorusADD)
         add.io.A := RegNext(mul.io.Y)
-        add.io.B := RegNext(Mux(ShiftRegister(digitreg===0.U,conf.muldelay),0.U,ShiftRegister(accmem.io.out((k+1)*64-1,k*64),conf.muldelay-1)))
+        add.io.B := RegNext(Mux(ShiftRegister(digitreg===0.U,conf.muldelay),0.U,ShiftRegister(add.io.Y,conf.numcycle-2)))
         accbus(k) := add.io.Y
     }
-    accmem.io.rreq := false.B
-    accmem.io.wreq := ShiftRegister(wenwire,conf.muldelay+1+1)
-    accmem.io.in := Cat(accbus.reverse)
-    accmem.io.flush := false.B
+    io.out := RegNext(outwire)
     io.debugout := Cat(accbus.reverse)
-    io.debugvalid := accmem.io.wreq
+    io.debugvalid := ShiftRegister(wenwire,conf.muldelay+1+1)
 
-    val statereg = RegInit(MULandACCState.RUN)
+    val outflag = Wire(Bool())
+    outflag := false.B
 
-    switch(statereg){
-        is(MULandACCState.RUN){
-            when(io.validin && trgswbatchmem.io.trgswoutvalid){
-                trgswbatchmem.io.trgswoutready := true.B
-                wenwire := true.B
-                when(digitreg=/=0.U){
-                    accmem.io.rreq := true.B
-                }
-                when(cyclereg=/=(conf.numcycle-1).U){
-                    cyclereg := cyclereg + 1.U
-                }.otherwise{
-                    cyclereg := 0.U
-                    when(digitreg =/= (2*conf.l-1).U){
-                        digitreg := digitreg + 1.U
-                    }.otherwise{
-                        digitreg := 0.U
-                        if(delay==0){
-                            statereg := MULandACCState.OUT
-                        }else{
-                            statereg := MULandACCState.DELAY
-                        }
-                    }
-                }
+    // Processing loop: runs continuously when data is available
+    when(io.validin && trgswbatchmem.io.trgswoutvalid){
+        trgswbatchmem.io.trgswoutready := true.B
+        wenwire := true.B
+        when(cyclereg=/=(conf.numcycle-1).U){
+            cyclereg := cyclereg + 1.U
+        }.otherwise{
+            cyclereg := 0.U
+            when(digitreg =/= (2*conf.l-1).U){
+                digitreg := digitreg + 1.U
+            }.otherwise{
+                digitreg := 0.U
+                outflag := true.B
             }
         }
-        is(MULandACCState.DELAY){
-            cyclereg := cyclereg + 1.U
-            when(cyclereg===(conf.numcycle-1).U){
-                cyclereg := 0.U
-                statereg := MULandACCState.OUT
+    }
+
+    // Output staging
+    val outcnt = RegInit(0.U(conf.cyclebit.W))
+    val outflagreg = RegInit(false.B)
+
+    if(delay != 0){
+        val delaycnt = RegInit(0.U(log2Ceil(conf.numcycle*delay).W))
+        val delaystate = RegInit(false.B)
+        when(outflag && !delaystate && !outflagreg){ delaystate := true.B }
+        when(delaystate){
+            when(delaycnt === (conf.numcycle*delay-1).U){
+                delaycnt := 0.U
+                delaystate := false.B
+                outflagreg := true.B
+            }.otherwise{
+                delaycnt := delaycnt + 1.U
             }
         }
-        is(MULandACCState.OUT){
-            validwire := true.B
-            accmem.io.rreq := true.B
-            cyclereg := cyclereg + 1.U
-            when(cyclereg===(conf.numcycle-1).U){
-                cyclereg := 0.U
-                statereg := MULandACCState.RUN
-                accmem.io.flush := true.B
-            }
+    }else{
+        when(outflag){ outflagreg := true.B }
+    }
+
+    when(outflagreg){
+        validwire := true.B
+        when(outcnt === (conf.numcycle-1).U){
+            outcnt := 0.U
+            outflagreg := false.B
+        }.otherwise{
+            outcnt := outcnt + 1.U
         }
     }
 }

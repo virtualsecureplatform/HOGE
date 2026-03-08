@@ -55,10 +55,6 @@ class BlindRotate(implicit val conf:Config) extends Module{
 	val batchreg = RegInit(0.U(log2Ceil(conf.numbatch).W))
 	val brcntreg = RegInit(0.U(log2Ceil(conf.n).W))
 
-	// Gap counter for pipelined batch timing
-	// After decomp readyin, wait numcycle*(k+1)-1 more cycles so MUL+ACC finishes DELAY/OUT
-	val gapWaitCnt = RegInit(0.U(log2Ceil(conf.numcycle * (conf.k + 1)).W))
-
 	// Default amem read address outputs
 	val amemBatchIdx = Wire(UInt(log2Ceil(conf.numbatch).W))
 	val amemDimIdx = Wire(UInt(log2Ceil(conf.n).W))
@@ -126,6 +122,7 @@ class BlindRotate(implicit val conf:Config) extends Module{
 	sei.io.enable := false.B
 	sei.io.axi4sout <> io.axi4sglobalout
 
+	val gapWaitCnt = RegInit(0.U(log2Ceil(conf.numcycle * (conf.k + 1)).W))
 	val statereg = RegInit(BlindRotateState.WAIT)
 	switch(statereg){
 		is(BlindRotateState.WAIT){
@@ -183,8 +180,7 @@ class BlindRotate(implicit val conf:Config) extends Module{
 			io.debugvalid := pmbxmo.io.valid
 		}
 		is(BlindRotateState.PMBXGAP){
-			// Wait for decomposition ready, then wait additional cycles
-			// so MUL+ACC finishes DELAY/OUT before next batch's data arrives
+			// Wait for decomposition ready with gap counter before starting next batch's PMBX
 			amemBatchIdx := batchreg
 			amemDimIdx := brcntreg
 			when(io.decreadyin){
