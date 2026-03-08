@@ -14,6 +14,7 @@ class Decomposition(implicit val conf:Config) extends Module{
 		val out = Output(Vec(conf.chunk,Vec(conf.radix,UInt(conf.Qbit.W))))
         val validin = Input(Bool())
         val validout = Output(Bool())
+        val readyin = Output(Bool())
 	})
 
     val digitreg = RegInit(0.U(log2Ceil(conf.l).W))
@@ -27,6 +28,7 @@ class Decomposition(implicit val conf:Config) extends Module{
     io.validout := false.B
 
     val statereg = RegInit(DecompositionState.WAIT)
+    io.readyin := statereg === DecompositionState.WAIT || statereg === DecompositionState.INIT
     switch(statereg){
         is(DecompositionState.WAIT){
             io.validout := RegNext(io.validin)
@@ -287,6 +289,7 @@ class ExternalProductFormer(implicit val conf:Config) extends Module{
 	val io = IO(new Bundle{
         val axi4sin = Vec(conf.trlwenumbus,new AXI4StreamSubordinate(conf.buswidth))
         val axi4sout = Vec(conf.trlwenumbus,new AXI4StreamManager(conf.buswidth))
+        val readyin = Output(Bool())
 	})
     val tdatavec = Wire(Vec(conf.trlwenumbus,UInt(conf.buswidth.W)))
     for(i <- 0 until conf.trlwenumbus){
@@ -297,6 +300,7 @@ class ExternalProductFormer(implicit val conf:Config) extends Module{
 	val decomp = Module(new Decomposition)
     decomp.io.in := Cat(tdatavec.reverse)
     decomp.io.validin := io.axi4sin(0).TVALID
+    io.readyin := decomp.io.readyin
 
 
     for(i <- 0 until conf.trlwenumbus){

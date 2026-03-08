@@ -18,7 +18,7 @@ class RotatedTestVector(implicit val conf:Config) extends Module{
 }
 
 object BlindRotateState extends ChiselEnum {
-  val WAIT,INIT,BUBBLE,PMBXMOWAIT,RUN,OUT = Value
+  val WAIT,INIT,BUBBLE,PMBXMOWAIT,PMBXGAP,RUN,OUT = Value
 }
 
 class BlindRotate(implicit val conf:Config) extends Module{
@@ -33,6 +33,7 @@ class BlindRotate(implicit val conf:Config) extends Module{
 		val enable = Input(Bool())
 		val extpfin = Output(Bool())
 		val done = Output(Bool())
+		val decreadyin = Input(Bool())
 
 		val debugout = Output(UInt((conf.block*conf.Qbit).W))
 		val debugvalid = Output(Bool())
@@ -53,6 +54,10 @@ class BlindRotate(implicit val conf:Config) extends Module{
 	// Batch processing registers
 	val batchreg = RegInit(0.U(log2Ceil(conf.numbatch).W))
 	val brcntreg = RegInit(0.U(log2Ceil(conf.n).W))
+
+	// Gap counter for pipelined batch timing
+	// After decomp readyin, wait numcycle*(k+1)-1 more cycles so MUL+ACC finishes DELAY/OUT
+	val gapWaitCnt = RegInit(0.U(log2Ceil(conf.numcycle * (conf.k + 1)).W))
 
 	// Default amem read address outputs
 	val amemBatchIdx = Wire(UInt(log2Ceil(conf.numbatch).W))
@@ -75,6 +80,12 @@ class BlindRotate(implicit val conf:Config) extends Module{
 		initcnt := initcnt + 1.U
 		when(initcnt === (2*conf.numcycle-1).U){
 			initcnt := 0.U
+			// Auto-increment feedbackbatch when one batch's feedback is done
+			when(feedbackbatch =/= (conf.numbatch-1).U){
+				feedbackbatch := feedbackbatch + 1.U
+			}.otherwise{
+				feedbackbatch := 0.U
+			}
 		}
 	}
 	BRmem.io.wen := ShiftRegister(io.axi4sin(0).TVALID,conf.interslr/2+2)
@@ -84,7 +95,7 @@ class BlindRotate(implicit val conf:Config) extends Module{
 		io.axi4sin(i).TREADY := true.B
 		tdatavec(i) :=  ShiftRegister(io.axi4sin(i).TDATA,conf.interslr/2)
 	}
-	val finreg = RegInit(0.U(2.W))
+	val finreg = RegInit(0.U(log2Ceil(conf.numbatch+1).W))
     when(RegNext(~ShiftRegister(io.axi4sin(0).TVALID,conf.interslr/2)&&ShiftRegister(io.axi4sin(0).TVALID,conf.interslr/2+1))){
         finreg := finreg +1.U
     }
@@ -157,46 +168,54 @@ class BlindRotate(implicit val conf:Config) extends Module{
 			pmbxmoenablewire := true.B
 			BRmem.io.addr := batchreg * (2*conf.numcycle).U + (pmbxmo.io.insel<<conf.radixbit)+pmbxmo.io.inaddr
 			when(~pmbxmo.io.valid && RegNext(pmbxmo.io.valid)){
-				statereg := BlindRotateState.RUN
+				// PMBX for current batch done
+				pmbxmoenablewire := false.B  // disable PMBX for reset
+				when(batchreg =/= (conf.numbatch-1).U){
+					// More batches: pipeline next batch's PMBX
+					batchreg := batchreg + 1.U
+					statereg := BlindRotateState.PMBXGAP
+				}.otherwise{
+					// All batches' PMBX done, wait for all feedback
+					statereg := BlindRotateState.RUN
+				}
 			}
 			io.debugout := Cat(pmbxmo.io.out.reverse)
 			io.debugvalid := pmbxmo.io.valid
 		}
-		is(BlindRotateState.RUN){
-			pmbxmoenablewire := false.B
-			// Pre-read next iteration's a value from amem (SyncReadMem has 1-cycle latency)
-			// so that io.avalue is correct when PMBXMOWAIT starts
-			when(batchreg =/= (conf.numbatch-1).U){
-				amemBatchIdx := batchreg + 1.U
-				amemDimIdx := brcntreg
-			}.otherwise{
-				amemBatchIdx := 0.U
-				amemDimIdx := brcntreg + 1.U
+		is(BlindRotateState.PMBXGAP){
+			// Wait for decomposition ready, then wait additional cycles
+			// so MUL+ACC finishes DELAY/OUT before next batch's data arrives
+			amemBatchIdx := batchreg
+			amemDimIdx := brcntreg
+			when(io.decreadyin){
+				when(gapWaitCnt === (conf.numcycle * (conf.k + 1) - 2).U){
+					gapWaitCnt := 0.U
+					pmbxmoenablewire := true.B
+					statereg := BlindRotateState.PMBXMOWAIT
+				}.otherwise{
+					gapWaitCnt := gapWaitCnt + 1.U
+				}
 			}
-			when(finreg===1.U){
+		}
+		is(BlindRotateState.RUN){
+			// Wait for all batches' feedback to complete
+			// Pre-read amem for batch 0, next dimension
+			amemBatchIdx := 0.U
+			amemDimIdx := brcntreg + 1.U
+			when(finreg === conf.numbatch.U){
 				finreg := 0.U
 				io.extpfin := true.B
-				when(batchreg =/= (conf.numbatch-1).U){
-					// More batches for this dimension
-					batchreg := batchreg + 1.U
-					feedbackbatch := batchreg + 1.U
-					pmbxmoenablewire := true.B
-					// Issue amem read for next batch, same dim
-					amemBatchIdx := batchreg + 1.U
-					amemDimIdx := brcntreg
-					statereg := BlindRotateState.PMBXMOWAIT
-				}.elsewhen(RegNext(brcntreg =/= (conf.n-1).U)){
-					// Last batch, more dimensions
+				feedbackbatch := 0.U
+				when(RegNext(brcntreg =/= (conf.n-1).U)){
+					// More dimensions: start PMBX for batch 0, next dim
 					batchreg := 0.U
-					feedbackbatch := 0.U
 					brcntreg := brcntreg + 1.U
 					pmbxmoenablewire := true.B
-					// Issue amem read for first batch, next dim
 					amemBatchIdx := 0.U
 					amemDimIdx := brcntreg + 1.U
 					statereg := BlindRotateState.PMBXMOWAIT
 				}.otherwise{
-					// Last batch, last dimension
+					// Last dimension done
 					batchreg := 0.U
 					statereg := BlindRotateState.OUT
 				}
@@ -253,6 +272,7 @@ class AXISBRFormer(implicit val conf:Config) extends Module{
 
 	br.io.axi4sout <> extpformer.io.axi4sin
 	br.io.axi4sin <> io.axi4sin
+	br.io.decreadyin := extpformer.io.readyin
 
 	br.io.axi4sglobalout <> outslice.io.subordinate
 

@@ -351,7 +351,8 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
         brres_batch[b], (*bkntt)[i], abar_batch[b]);
   }
 
-  // Check debug output for each batch
+  // Pipelined batching: all PMBX outputs come first, then all feedbacks
+  // Check PMBX debug output for each batch
   for(uint batch = 0; batch < numbatch; batch++){
     // Wait for PMBX debug valid
     watchdog = 0;
@@ -373,7 +374,6 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
           std::cout<<"PMBXERROR:"<<l<<":"<<ii<<":"<<j<<" pos="<<(radix*j+ii)
                    <<" batch="<<batch<<" dim="<<i<<std::endl;
           std::cout<<"hw="<<dut->io_debugout[j]<<" sw="<<pmbx_batch[batch][l][radix*j+ii]<<std::endl;
-          // Print a few more values for context
           for(int jj=0;jj<radix;jj++){
             if(dut->io_debugout[jj]!=pmbx_batch[batch][l][radix*jj+ii])
               std::cout<<"  diff j="<<jj<<" pos="<<(radix*jj+ii)<<" hw="<<dut->io_debugout[jj]<<" sw="<<pmbx_batch[batch][l][radix*jj+ii]<<std::endl;
@@ -385,7 +385,10 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
       }
       clock(dut, tfp);
     }
+  }
 
+  // Check feedback debug output for each batch (arrives after all PMBX)
+  for(uint batch = 0; batch < numbatch; batch++){
     // Wait for feedback debug valid (a[0])
     watchdog = 0;
     while(dut->io_debugvalid==0){
