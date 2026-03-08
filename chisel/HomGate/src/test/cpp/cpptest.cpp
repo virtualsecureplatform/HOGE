@@ -77,53 +77,39 @@ int main(int argc, char** argv) {
   for(int i = 0; i<TFHEpp::lvl1param::n; i++) for(int j = 0; j < TFHEpp::lvl10param::t; j++) for(int k = 0; k< 1 << (TFHEpp::lvl10param::basebit - 1); k++) for(int l = 0; l < hbmwordsinbus; l++) for(int m = 0; m < iksknumbus; m++) for(int n = 0; n < totaliksknumbus/iksknumbus; n++) { int idx = n*iksknumbus*hbmwordsinbus+m*hbmwordsinbus+l; if(idx <= TFHEpp::lvl0param::n) ikskaligned[m][i][j][k][n][l] = (*iksk)[i][j][k][idx]; }
 
   constexpr uint alignedlenlvl1 = (((std::numeric_limits<TFHEpp::lvl1param::T>::digits*(TFHEpp::lvl1param::n+1)>>buswidthlb)+1)<<buswidthlb)/std::numeric_limits<TFHEpp::lvl1param::T>::digits;
-  using alignedTLWElvl1 = std::array<TFHEpp::lvl1param::T,alignedlenlvl1>;
 
-  const bool pa = (binary(engine) > 0);
-  const bool pb = (binary(engine) > 0);
-  TFHEpp::TLWE<TFHEpp::lvl1param> tlwea, tlweb;
-  TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlwea, pa ? TFHEpp::lvl1param::μ : -TFHEpp::lvl1param::μ, TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
-  TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlweb, pb ? TFHEpp::lvl1param::μ : -TFHEpp::lvl1param::μ, TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
-  TFHEpp::TLWE<TFHEpp::lvl1param> res,tlwelvl1;
-  //AND
-  for(int l = 0; l<= TFHEpp::lvl1param::n; l++) tlwelvl1[l] = tlwea[l] + tlweb[l];
-  tlwelvl1[TFHEpp::lvl1param::n] -= TFHEpp::lvl1param::μ;
+  // Per-batch independent plaintexts and ciphertexts
+  std::array<bool, numbatch> pla, plb;
+  std::array<TFHEpp::TLWE<TFHEpp::lvl1param>, numbatch> tlwea_batch, tlweb_batch, tlwelvl1_batch;
+  std::array<TFHEpp::TLWE<TFHEpp::lvl0param>, numbatch> tlwelvl0_batch;
+  for(uint b = 0; b < numbatch; b++){
+    pla[b] = (binary(engine) > 0);
+    plb[b] = (binary(engine) > 0);
+    TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlwea_batch[b], pla[b] ? TFHEpp::lvl1param::μ : -TFHEpp::lvl1param::μ, TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
+    TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlweb_batch[b], plb[b] ? TFHEpp::lvl1param::μ : -TFHEpp::lvl1param::μ, TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
+    //AND
+    for(int l = 0; l <= TFHEpp::lvl1param::n; l++) tlwelvl1_batch[b][l] = tlwea_batch[b][l] + tlweb_batch[b][l];
+    tlwelvl1_batch[b][TFHEpp::lvl1param::n] -= TFHEpp::lvl1param::μ;
+    tlwelvl0_batch[b] = {};
+    TFHEpp::IdentityKeySwitch<TFHEpp::lvl10param>(tlwelvl0_batch[b], tlwelvl1_batch[b], *iksk);
+    std::cout<<"batch "<<b<<": pa="<<pla[b]<<" pb="<<plb[b]<<" AND="<<(pla[b]&&plb[b])<<std::endl;
+  }
 
-  using alignedTLWElvl1 = std::array<TFHEpp::lvl1param::T,alignedlenlvl1>;
-  alignedTLWElvl1 tlweaaligned = {},tlwebaligned = {}, resaligned, tlwelvl1aligned={};
-  for(int l = 0; l<= TFHEpp::lvl1param::n; l++) tlwelvl1aligned[l] = tlwelvl1[l];
-  for(int l = 0; l<= TFHEpp::lvl1param::n; l++) tlweaaligned[l] = tlwea[l];
-  for(int l = 0; l<= TFHEpp::lvl1param::n; l++) tlwebaligned[l] = tlweb[l];
-  TFHEpp::TLWE<TFHEpp::lvl0param> tlwelvl0 = {};
-  TFHEpp::IdentityKeySwitch<TFHEpp::lvl10param>(tlwelvl0,tlwelvl1,*iksk);
-
-  TFHEpp::Polynomial<TFHEpp::lvl1param> testvec;
-  for (int i = 0; i < TFHEpp::lvl1param::n; i++)
-      testvec[i] = TFHEpp::lvl1param::μ;
-
-  TFHEpp::TRLWE<TFHEpp::lvl1param> brres;
-  brres[0] = {};
-  const uint32_t b̄ =
-        2 * TFHEpp::lvl1param::n - (tlwelvl0[TFHEpp::lvl0param::n] >>(std::numeric_limits<typename TFHEpp::lvl0param::T>::digits - 1 - TFHEpp::lvl1param::nbit) );
-
-  // Combined input arrays for batch processing (same TLWE for all batches)
+  // Combined input arrays for batch processing (separate A and B channels)
   constexpr uint totalInputLen = numbatch * alignedlenlvl1;
   constexpr uint totalInputBusWords = totalInputLen / buswords;
   std::array<TFHEpp::lvl1param::T, totalInputLen> combinedA = {};
   std::array<TFHEpp::lvl1param::T, totalInputLen> combinedB = {};
-  std::array<TFHEpp::lvl1param::T, totalInputLen> combinedLvl1 = {};
   for(uint b = 0; b < numbatch; b++){
     for(int l = 0; l <= TFHEpp::lvl1param::n; l++){
-      combinedA[b*alignedlenlvl1+l] = tlwea[l];
-      combinedB[b*alignedlenlvl1+l] = tlweb[l];
-      combinedLvl1[b*alignedlenlvl1+l] = tlwelvl1[l];
+      combinedA[b*alignedlenlvl1+l] = tlwea_batch[b][l];
+      combinedB[b*alignedlenlvl1+l] = tlweb_batch[b][l];
     }
   }
 
   Verilated::commandArgs(argc, argv);
   VHomGateWrap *dut = new VHomGateWrap();
 
-  Verilated::traceEverOn(false);
   VerilatedFstC* tfp = nullptr;
 
   // Format
@@ -194,7 +180,8 @@ int main(int argc, char** argv) {
   dut->io_axi4ina_TVALID = 1;
   dut->io_axi4inb_TVALID = 1;
 
-  //Initialize Input Buffer (send numbatch TLWEs with proper TREADY handling)
+  //Initialize Input Buffer (send numbatch TLWEs: a to ina, b to inb)
+  // Hardware computes: scaledA + scaledB + offset = a + b - mu (AND gate)
   for(uint i = 0; i < totalInputBusWords; i++){
     for(int j = 0; j < buswords; j++){
       dut->io_axi4ina_TDATA[j] = combinedA[buswords*i+j];
@@ -316,7 +303,7 @@ int main(int argc, char** argv) {
   // Verify IKS output for each batch
   for(uint batch = 0; batch < numbatch; batch++){
     for(int j = 0; j<=TFHEpp::lvl0param::n;j++){
-      TFHEpp::lvl0param::T trueout = tlwelvl0[j];
+      TFHEpp::lvl0param::T trueout = tlwelvl0_batch[batch][j];
       TFHEpp::lvl0param::T circout = reslvl0[batch * alignedlenlvl0 + j];
       if(trueout != circout){
         std::cout<<"IKS Error batch "<<batch<<": "<<trueout<<":"<<circout<<std::endl;
@@ -332,8 +319,15 @@ int main(int argc, char** argv) {
 
   std::cout<<"BR"<<std::endl;
 
-  brres[0] = {};
-  TFHEpp::PolynomialMulByXai<TFHEpp::lvl1param>(brres[1],TFHEpp::μpolygen<TFHEpp::lvl1param,TFHEpp::lvl1param::μ>(),b̄);
+  // Per-batch BR state
+  std::array<TFHEpp::TRLWE<TFHEpp::lvl1param>, numbatch> brres_batch;
+  std::array<uint32_t, numbatch> bbar_batch;
+  for(uint b = 0; b < numbatch; b++){
+    bbar_batch[b] = 2 * TFHEpp::lvl1param::n - (tlwelvl0_batch[b][TFHEpp::lvl0param::n] >> (std::numeric_limits<typename TFHEpp::lvl0param::T>::digits - 1 - TFHEpp::lvl1param::nbit));
+    brres_batch[b][0] = {};
+    TFHEpp::PolynomialMulByXai<TFHEpp::lvl1param>(brres_batch[b][1], TFHEpp::μpolygen<TFHEpp::lvl1param,TFHEpp::lvl1param::μ>(), bbar_batch[b]);
+    std::cout<<"batch "<<b<<" bbar="<<bbar_batch[b]<<" body="<<tlwelvl0_batch[b][TFHEpp::lvl0param::n]<<std::endl;
+  }
 
   count = 0;
 
@@ -343,16 +337,19 @@ int main(int argc, char** argv) {
 
 constexpr typename TFHEpp::lvl0param::T roundoffset = 1ULL << (std::numeric_limits<typename TFHEpp::lvl0param::T>::digits - 2 - TFHEpp::lvl1param::nbit);
 for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
-  const uint32_t ā = (tlwelvl0[i]+roundoffset)>>(std::numeric_limits<typename TFHEpp::lvl0param::T>::digits - 1 - TFHEpp::lvl1param::nbit);
-
-  // Compute PMBX from pre-CMUX brres (same for all batches with identical input)
-  TFHEpp::TRLWE<TFHEpp::lvl1param> pmbx;
-  TFHEpp::PolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(pmbx[0],brres[0],ā);
-  TFHEpp::PolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(pmbx[1],brres[1],ā);
-
-  // Software CMUX update (compute post-CMUX brres)
-  TFHEpp::CMUXwithPolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(
-      brres, (*bkntt)[i], ā);
+  // Per-batch exponents and PMBX/CMUX references
+  std::array<uint32_t, numbatch> abar_batch;
+  std::array<TFHEpp::TRLWE<TFHEpp::lvl1param>, numbatch> pmbx_batch;
+  for(uint b = 0; b < numbatch; b++){
+    abar_batch[b] = (tlwelvl0_batch[b][i]+roundoffset)>>(std::numeric_limits<typename TFHEpp::lvl0param::T>::digits - 1 - TFHEpp::lvl1param::nbit);
+    if(i==0) std::cout<<"batch "<<b<<" dim0 abar="<<abar_batch[b]<<" a[0]="<<tlwelvl0_batch[b][0]<<std::endl;
+    // Compute PMBX from pre-CMUX brres
+    TFHEpp::PolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(pmbx_batch[b][0], brres_batch[b][0], abar_batch[b]);
+    TFHEpp::PolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(pmbx_batch[b][1], brres_batch[b][1], abar_batch[b]);
+    // Software CMUX update
+    TFHEpp::CMUXwithPolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(
+        brres_batch[b], (*bkntt)[i], abar_batch[b]);
+  }
 
   // Check debug output for each batch
   for(uint batch = 0; batch < numbatch; batch++){
@@ -368,13 +365,19 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
         exit(1);
       }
     }
-    // Check PMBX output (same for all batches)
+    // Check PMBX output
     for(int l = 0; l < TFHEpp::lvl1param::k+1; l++)
     for(int ii = 0; ii < radix; ii++){
       for(int j = 0; j < radix; j++) {
-        if(dut->io_debugout[j]!=pmbx[l][radix*j+ii]){
-          std::cout<<"PMBXERROR:"<<l<<":"<<ii<<":"<<j<<" batch="<<batch<<std::endl;
-          std::cout<<dut->io_debugout[j]<<":"<<pmbx[l][radix*j+ii]<<std::endl;
+        if(dut->io_debugout[j]!=pmbx_batch[batch][l][radix*j+ii]){
+          std::cout<<"PMBXERROR:"<<l<<":"<<ii<<":"<<j<<" pos="<<(radix*j+ii)
+                   <<" batch="<<batch<<" dim="<<i<<std::endl;
+          std::cout<<"hw="<<dut->io_debugout[j]<<" sw="<<pmbx_batch[batch][l][radix*j+ii]<<std::endl;
+          // Print a few more values for context
+          for(int jj=0;jj<radix;jj++){
+            if(dut->io_debugout[jj]!=pmbx_batch[batch][l][radix*jj+ii])
+              std::cout<<"  diff j="<<jj<<" pos="<<(radix*jj+ii)<<" hw="<<dut->io_debugout[jj]<<" sw="<<pmbx_batch[batch][l][radix*jj+ii]<<std::endl;
+          }
           dut->final();
           if(tfp) tfp->close();
           exit(1);
@@ -398,9 +401,9 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
     // Check feedback a[0] (against post-CMUX brres)
     for(int cycle = 0; cycle<numcycle;cycle++){
       for(int m = 0; m<radix;m++)
-      if(dut->io_debugout[m]!=brres[0][m*radix+cycle]){
+      if(dut->io_debugout[m]!=brres_batch[batch][0][m*radix+cycle]){
         std::cout<<i<<":0:"<<cycle<<":"<<m<<" batch="<<batch<<std::endl;
-        std::cout<<"ERROR:"<<brres[0][m*radix+cycle]<<":"<<dut->io_debugout[m]<<std::endl;
+        std::cout<<"ERROR:"<<brres_batch[batch][0][m*radix+cycle]<<":"<<dut->io_debugout[m]<<std::endl;
         dut->final();
         if(tfp) tfp->close();
         exit(1);
@@ -423,9 +426,9 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
     // Check feedback a[1] (against post-CMUX brres)
     for(int cycle = 0; cycle<numcycle;cycle++){
       for(int m = 0; m<radix;m++)
-      if(dut->io_debugout[m]!=brres[1][m*radix+cycle]){
+      if(dut->io_debugout[m]!=brres_batch[batch][1][m*radix+cycle]){
         std::cout<<i<<":1:"<<cycle<<":"<<m<<" batch="<<batch<<std::endl;
-        std::cout<<brres[1][m*radix+cycle]<<":"<<dut->io_debugout[m]<<std::endl;
+        std::cout<<brres_batch[batch][1][m*radix+cycle]<<":"<<dut->io_debugout[m]<<std::endl;
         dut->final();
         if(tfp) tfp->close();
         exit(1);
@@ -451,7 +454,11 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
     }
   }
 
-  TFHEpp::SampleExtractIndex<TFHEpp::lvl1param>(res,brres,0);
+  // Per-batch SampleExtract reference
+  std::array<TFHEpp::TLWE<TFHEpp::lvl1param>, numbatch> res_batch;
+  for(uint b = 0; b < numbatch; b++){
+    TFHEpp::SampleExtractIndex<TFHEpp::lvl1param>(res_batch[b], brres_batch[b], 0);
+  }
 
   constexpr uint outputElements = TFHEpp::lvl1param::k*TFHEpp::lvl1param::n + 1;
   std::array<TFHEpp::lvl1param::T, numbatch * outputElements> resout = {};
@@ -466,7 +473,7 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
   // Verify output for each batch
   for(uint batch = 0; batch < numbatch; batch++){
     for(uint j = 0; j < outputElements; j++){
-      uint32_t trueout = res[j];
+      uint32_t trueout = res_batch[batch][j];
       uint32_t circout = resout[batch * outputElements + j];
       if(trueout != circout){
         std::cout<<"Output Error batch "<<batch<<" index "<<j<<std::endl;

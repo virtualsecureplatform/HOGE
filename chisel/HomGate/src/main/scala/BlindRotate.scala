@@ -106,6 +106,9 @@ class BlindRotate(implicit val conf:Config) extends Module{
 	val tvgen = Module(new RotatedTestVector)
 	tvgen.io.exponent := io.bvalue
 
+	val initAddrPipe = RegNext(batchreg * (2*conf.numcycle).U + initcnt)
+	val initDataPipe = RegNext(Mux(initcnt(conf.radixbit),Cat(tvgen.io.out(initcnt).reverse),0.U))
+
 	val sei = Module(new SampleExtractIndex(0,conf))
 
 	sei.io.in := BRmem.io.out
@@ -123,9 +126,9 @@ class BlindRotate(implicit val conf:Config) extends Module{
 		}
 		is(BlindRotateState.INIT){
 			BRmem.io.wen := true.B
-			BRmem.io.addr := batchreg * (2*conf.numcycle).U + RegNext(initcnt)
-			BRmem.io.in := RegNext(Mux(initcnt(conf.radixbit),Cat(tvgen.io.out(initcnt).reverse),0.U))
-			io.debugout := RegNext(Mux(initcnt(conf.radixbit),Cat(tvgen.io.out(initcnt).reverse),0.U))
+			BRmem.io.addr := initAddrPipe
+			BRmem.io.in := initDataPipe
+			io.debugout := initDataPipe
 			amemBatchIdx := batchreg
 			when(initcnt =/= (2*conf.numcycle-1).U){
 				initcnt := initcnt + 1.U
@@ -141,8 +144,8 @@ class BlindRotate(implicit val conf:Config) extends Module{
 		}
 		is(BlindRotateState.BUBBLE){
 			BRmem.io.wen := true.B
-			BRmem.io.addr := RegNext(initcnt)
-			BRmem.io.in := RegNext(Mux(initcnt(conf.radixbit),Cat(tvgen.io.out(initcnt).reverse),0.U))
+			BRmem.io.addr := initAddrPipe
+			BRmem.io.in := initDataPipe
 			pmbxmoenablewire := true.B
 			// Issue amem read for first batch, first dim
 			amemBatchIdx := 0.U
