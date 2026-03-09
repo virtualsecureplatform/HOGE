@@ -152,7 +152,7 @@ int main(int argc, char* argv[]) {
 		for(int i = 0; i < iksknumbus; i++) bo_indices[3 + i] = bo_iksks[i];
 		for(int i = 0; i < bknumbus; i++) bo_indices[3 + iksknumbus + i] = bo_bks[i];
 
-		for(int test = 0; test < 10; test++){
+		for(int test = 0; test < 2; test++){
 			// Write numbatch copies of input data and sync
 			fpga_write_buffer(bo_ina, combinedA.data(), inputBufSize);
 			fpga_write_buffer(bo_inb, combinedB.data(), inputBufSize);

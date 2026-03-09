@@ -219,9 +219,9 @@ if [ "${RUN_TEST}" = true ]; then
     export XCL_EMULATION_MODE=hw_emu
     export EMCONFIG_PATH="${XCLBIN_DIR}"
 
-    # Run the test with timeout (3600s = 60 min, enough for 2 gates)
+    # Run the test with timeout (9000s = 150 min, enough for 2 gates at numbatch=3 ~46min each)
     cd "${REPO_DIR}"
-    timeout 3600 "${NAND_BIN}" "${XCLBIN_FILE}" 2>&1 | tee "${BUILD_DIR}/nand_test.log"
+    timeout 9000 "${NAND_BIN}" "${XCLBIN_FILE}" 2>&1 | tee "${BUILD_DIR}/nand_test.log"
     TEST_EXIT=$?
 
     if [ ${TEST_EXIT} -eq 0 ]; then
@@ -232,7 +232,7 @@ if [ "${RUN_TEST}" = true ]; then
     elif [ ${TEST_EXIT} -eq 124 ]; then
         echo ""
         echo "============================================"
-        echo "hw_emu nand test timed out (3600s)"
+        echo "hw_emu nand test timed out (9000s)"
         echo "Check ${BUILD_DIR}/nand_test.log for partial results"
         echo "============================================"
     else
