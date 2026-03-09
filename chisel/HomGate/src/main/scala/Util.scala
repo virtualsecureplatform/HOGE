@@ -127,14 +127,14 @@ class MultUint64Verilate(implicit val conf:Config) extends Module{
 }
 
 class S2MMTlastCounter(implicit val conf:Config) extends Module{
-	val numBeats = conf.N + 1 // TLWE ciphertext: N+1 coefficients
+	val totalBeats = conf.numbatch * (conf.N + 1) // numbatch TLWE ciphertexts: each N+1 coefficients
 	val io = IO(new Bundle{
 		val subordinate = new AXI4StreamSubordinate(conf.Qbit)
 		val manager = new AXI4StreamManager(conf.Qbit)
 		val tlast = Output(Bool())
 	})
-	val counter = RegInit(0.U(log2Ceil(numBeats).W))
-	val lastBeat = counter === (numBeats - 1).U
+	val counter = RegInit(0.U(log2Ceil(totalBeats).W))
+	val lastBeat = counter === (totalBeats - 1).U
 
 	// Pass through stream
 	io.manager.TVALID := io.subordinate.TVALID

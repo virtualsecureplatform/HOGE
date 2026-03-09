@@ -99,12 +99,16 @@ class HomGateTop(implicit val conf:Config) extends Module{
 	io.axi4inacmd.TVALID := false.B
 	io.axi4inbcmd.TVALID := false.B
 
-	io.axi4outcmd.TDATA:=Cat(io.outaddr,false.B,true.B,0.U(6.W),true.B,ceil(conf.Qbit*(conf.N+1).toFloat*conf.numbatch/8).toInt.U(23.W))
-	io.axi4inacmd.TDATA:=Cat(io.inaaddr,false.B,true.B,0.U(6.W),true.B,ceil(conf.Qbit*(conf.N+1).toFloat*conf.numbatch/8).toInt.U(23.W))
-	io.axi4inbcmd.TDATA:=Cat(io.inbaddr,false.B,true.B,0.U(6.W),true.B,ceil(conf.Qbit*(conf.N+1).toFloat*conf.numbatch/8).toInt.U(23.W))
+	// Input BTT must be bus-aligned per batch: TLWEADD expects ceil(Qbit*(N+1)/buswidth) bus words per TLWE
+	val inputBytesPerBatch = ceil(conf.Qbit*(conf.N+1).toFloat/conf.buswidth).toInt * (conf.buswidth/8)
+	// Output BTT is exact (output stream is Qbit-wide, no bus alignment needed)
+	val outputBTT = ceil(conf.Qbit*(conf.N+1).toFloat*conf.numbatch/8).toInt
+	io.axi4outcmd.TDATA:=Cat(io.outaddr,false.B,true.B,0.U(6.W),true.B,outputBTT.U(23.W))
+	io.axi4inacmd.TDATA:=Cat(io.inaaddr,false.B,true.B,0.U(6.W),true.B,(inputBytesPerBatch*conf.numbatch).U(23.W))
+	io.axi4inbcmd.TDATA:=Cat(io.inbaddr,false.B,true.B,0.U(6.W),true.B,(inputBytesPerBatch*conf.numbatch).U(23.W))
 	for(i <- 0 until conf.iksknumbus){
 		io.axi4ikskincmd(i).TVALID := false.B
-		io.axi4ikskincmd(i).TDATA:=Cat(io.ikskaddr(i),false.B,true.B,0.U(6.W),true.B,(conf.hbmbuswidth*(conf.totaliksknumbus/conf.iksknumbus)*((1<<conf.basebit)-1)*conf.t*conf.N/8).U(23.W))
+		io.axi4ikskincmd(i).TDATA:=Cat(io.ikskaddr(i),false.B,true.B,0.U(6.W),true.B,(conf.hbmbuswidth*(conf.totaliksknumbus/conf.iksknumbus)*(1<<(conf.basebit-1))*conf.t*conf.N/8).U(23.W))
 	}
 	for(i <- 0 until conf.bknumbus){
 		io.axi4bkincmd(i).TVALID := false.B
@@ -119,6 +123,8 @@ class HomGateTop(implicit val conf:Config) extends Module{
 	val bkincmdreg = RegInit(VecInit(Seq.fill(conf.bknumbus)(0.U(1.W))))
 
 	val countreg = RegInit(0.U(3.W))
+	// Count brvalid falling edges to detect all numbatch batches received from BRBack
+	val batchdonereg = RegInit(0.U(log2Ceil(conf.numbatch).W))
 
 	switch(statereg){
 		is(HomGateState.WAIT){
@@ -134,6 +140,7 @@ class HomGateTop(implicit val conf:Config) extends Module{
 			outcmdreg := false.B
 			inacmdreg := false.B
 			inbcmdreg := false.B
+			batchdonereg := 0.U
 			for(i <- 0 until conf.iksknumbus){
 				ikskincmdreg(i) := false.B
 			}
@@ -180,9 +187,14 @@ class HomGateTop(implicit val conf:Config) extends Module{
 		}
 		is(HomGateState.RUN){
 			io.ap_idle := false.B
-			when(~io.brvalid&&RegNext(io.brvalid)){
-				io.ap_done := true.B
-				statereg := HomGateState.WAIT
+			when(~io.brvalid && RegNext(io.brvalid)){
+				// Brvalid falling edge = one batch's results received from BRBack
+				when(batchdonereg === (conf.numbatch - 1).U){
+					io.ap_done := true.B
+					statereg := HomGateState.WAIT
+				}.otherwise{
+					batchdonereg := batchdonereg + 1.U
+				}
 			}
 		}
 	}
@@ -303,5 +315,7 @@ class HomGateWrap(implicit val conf:Config) extends Module{
 }
 
 object HomGateWrapTop extends App {
-  (new chisel3.stage.ChiselStage).emitVerilog(new HomGateWrap()(Config()))
+  implicit val conf = Config()
+  (new chisel3.stage.ChiselStage).emitVerilog(new HomGateWrap)
+  (new chisel3.stage.ChiselStage).emitVerilog(new S2MMTlastCounter)
 }

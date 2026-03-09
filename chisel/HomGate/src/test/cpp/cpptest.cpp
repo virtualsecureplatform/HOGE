@@ -85,8 +85,8 @@ int main(int argc, char** argv) {
   for(uint b = 0; b < numbatch; b++){
     pla[b] = (binary(engine) > 0);
     plb[b] = (binary(engine) > 0);
-    TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlwea_batch[b], pla[b] ? TFHEpp::lvl1param::μ : -TFHEpp::lvl1param::μ, TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
-    TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlweb_batch[b], plb[b] ? TFHEpp::lvl1param::μ : -TFHEpp::lvl1param::μ, TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
+    TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlwea_batch[b], static_cast<TFHEpp::lvl1param::T>(pla[b] ? TFHEpp::lvl1param::μ : -TFHEpp::lvl1param::μ), TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
+    TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlweb_batch[b], static_cast<TFHEpp::lvl1param::T>(plb[b] ? TFHEpp::lvl1param::μ : -TFHEpp::lvl1param::μ), TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
     //AND
     for(int l = 0; l <= TFHEpp::lvl1param::n; l++) tlwelvl1_batch[b][l] = tlwea_batch[b][l] + tlweb_batch[b][l];
     tlwelvl1_batch[b][TFHEpp::lvl1param::n] -= TFHEpp::lvl1param::μ;
@@ -300,14 +300,13 @@ int main(int argc, char** argv) {
 
   std::cout<<"IKS output words: "<<outindex<<std::endl;
 
-  // Verify IKS output for each batch
+  // Both hardware and TFHEpp now use Koga's IKS - outputs must match exactly
   for(uint batch = 0; batch < numbatch; batch++){
     for(int j = 0; j<=TFHEpp::lvl0param::n;j++){
       TFHEpp::lvl0param::T trueout = tlwelvl0_batch[batch][j];
       TFHEpp::lvl0param::T circout = reslvl0[batch * alignedlenlvl0 + j];
       if(trueout != circout){
-        std::cout<<"IKS Error batch "<<batch<<": "<<trueout<<":"<<circout<<std::endl;
-        std::cout<<j<<std::endl;
+        std::cout<<"IKS Error batch "<<batch<<" j="<<j<<": hw="<<circout<<" sw="<<trueout<<std::endl;
         dut->final();
         if(tfp) tfp->close();
         exit(1);
@@ -315,18 +314,21 @@ int main(int argc, char** argv) {
     }
   }
 
+  // Use software IKS output for BR reference (matches hardware since both use Koga's IKS)
+  auto& hw_tlwelvl0_batch = tlwelvl0_batch;
+
   clock(dut, tfp);
 
   std::cout<<"BR"<<std::endl;
 
-  // Per-batch BR state
+  // Per-batch BR state - use hardware IKS output as reference input
   std::array<TFHEpp::TRLWE<TFHEpp::lvl1param>, numbatch> brres_batch;
   std::array<uint32_t, numbatch> bbar_batch;
   for(uint b = 0; b < numbatch; b++){
-    bbar_batch[b] = 2 * TFHEpp::lvl1param::n - (tlwelvl0_batch[b][TFHEpp::lvl0param::n] >> (std::numeric_limits<typename TFHEpp::lvl0param::T>::digits - 1 - TFHEpp::lvl1param::nbit));
+    bbar_batch[b] = 2 * TFHEpp::lvl1param::n - (hw_tlwelvl0_batch[b][TFHEpp::lvl0param::n] >> (std::numeric_limits<typename TFHEpp::lvl0param::T>::digits - 1 - TFHEpp::lvl1param::nbit));
     brres_batch[b][0] = {};
     TFHEpp::PolynomialMulByXai<TFHEpp::lvl1param>(brres_batch[b][1], TFHEpp::μpolygen<TFHEpp::lvl1param,TFHEpp::lvl1param::μ>(), bbar_batch[b]);
-    std::cout<<"batch "<<b<<" bbar="<<bbar_batch[b]<<" body="<<tlwelvl0_batch[b][TFHEpp::lvl0param::n]<<std::endl;
+    std::cout<<"batch "<<b<<" bbar="<<bbar_batch[b]<<" body="<<hw_tlwelvl0_batch[b][TFHEpp::lvl0param::n]<<std::endl;
   }
 
   count = 0;
@@ -341,8 +343,8 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
   std::array<uint32_t, numbatch> abar_batch;
   std::array<TFHEpp::TRLWE<TFHEpp::lvl1param>, numbatch> pmbx_batch;
   for(uint b = 0; b < numbatch; b++){
-    abar_batch[b] = (tlwelvl0_batch[b][i]+roundoffset)>>(std::numeric_limits<typename TFHEpp::lvl0param::T>::digits - 1 - TFHEpp::lvl1param::nbit);
-    if(i==0) std::cout<<"batch "<<b<<" dim0 abar="<<abar_batch[b]<<" a[0]="<<tlwelvl0_batch[b][0]<<std::endl;
+    abar_batch[b] = (hw_tlwelvl0_batch[b][i]+roundoffset)>>(std::numeric_limits<typename TFHEpp::lvl0param::T>::digits - 1 - TFHEpp::lvl1param::nbit);
+    if(i==0) std::cout<<"batch "<<b<<" dim0 abar="<<abar_batch[b]<<" a[0]="<<hw_tlwelvl0_batch[b][0]<<std::endl;
     // Compute PMBX from pre-CMUX brres
     TFHEpp::PolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(pmbx_batch[b][0], brres_batch[b][0], abar_batch[b]);
     TFHEpp::PolynomialMulByXaiMinusOne<TFHEpp::lvl1param>(pmbx_batch[b][1], brres_batch[b][1], abar_batch[b]);

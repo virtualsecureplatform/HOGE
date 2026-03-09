@@ -91,11 +91,12 @@ echo "============================================"
 echo "Step 2: Generating Verilog from Chisel..."
 echo "============================================"
 if [ ! -f "${VITIS_DIR}/rtl/HomGateWrap.v" ]; then
-    echo "Running sbt to generate HomGateWrap.v..."
+    echo "Running sbt to generate HomGateWrap.v and S2MMTlastCounter.v..."
     cd "${CHISEL_DIR}"
     sbt run
     cp "${CHISEL_DIR}/HomGateWrap.v" "${VITIS_DIR}/rtl/HomGateWrap.v"
-    echo "HomGateWrap.v generated and copied to vitis/rtl/"
+    cp "${CHISEL_DIR}/S2MMTlastCounter.v" "${VITIS_DIR}/rtl/S2MMTlastCounter.v"
+    echo "HomGateWrap.v and S2MMTlastCounter.v generated and copied to vitis/rtl/"
     cd "${REPO_DIR}"
 else
     echo "HomGateWrap.v already exists, skipping. Use --clean to regenerate."

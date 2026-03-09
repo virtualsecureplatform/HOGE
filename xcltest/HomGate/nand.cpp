@@ -20,6 +20,7 @@ extern "C" {
 }
 
 int main(int argc, char* argv[]) {
+	constexpr uint numbatch = 2;
 	constexpr uint16_t scaleaindex = 2;
 	constexpr uint16_t scalebindex = 2;
 	constexpr uint16_t offsetindex = 0;
@@ -50,8 +51,9 @@ int main(int argc, char* argv[]) {
 
 	const bool pa = (binary(engine) > 0);
 	const bool pb = (binary(engine) > 0);
-	alignas(4096) TFHEpp::TLWE<TFHEpp::lvl1param> tlwea = TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(pa,TFHEpp::lvl1param::α,sk->key.lvl1);
-	alignas(4096) TFHEpp::TLWE<TFHEpp::lvl1param> tlweb = TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(pb,TFHEpp::lvl1param::α,sk->key.lvl1);
+	TFHEpp::TLWE<TFHEpp::lvl1param> tlwea, tlweb;
+	TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlwea, pa ? TFHEpp::lvl1param::μ : static_cast<TFHEpp::lvl1param::T>(-TFHEpp::lvl1param::μ), TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
+	TFHEpp::tlweSymEncrypt<TFHEpp::lvl1param>(tlweb, pb ? TFHEpp::lvl1param::μ : static_cast<TFHEpp::lvl1param::T>(-TFHEpp::lvl1param::μ), TFHEpp::lvl1param::α, sk->key.get<TFHEpp::lvl1param>());
 	TFHEpp::TLWE<TFHEpp::lvl1param> tlweadded;
 	for(int l = 0; l<= TFHEpp::lvl1param::n; l++) tlweadded[l] = - tlwea[l] - tlweb[l];
 	tlweadded[TFHEpp::lvl1param::n] += TFHEpp::lvl1param::μ;
@@ -67,12 +69,30 @@ int main(int argc, char* argv[]) {
 	TFHEpp::TRLWE<TFHEpp::lvl1param> brres = {};
 	TFHEpp::BlindRotate<TFHEpp::lvl01param>(brres,tlwelvl0,*bkntt,TFHEpp::μpolygen<TFHEpp::lvl1param, TFHEpp::lvl1param::μ>());
 
-	alignas(4096) TFHEpp::TLWE<TFHEpp::lvl1param> res = {},kernelres = {};
+	TFHEpp::TLWE<TFHEpp::lvl1param> res = {};
   	TFHEpp::SampleExtractIndex<TFHEpp::lvl1param>(res,brres,0);
+
+	// Bus-aligned input arrays for numbatch TLWEs (same data replicated)
+	// DataMover BTT is bus-aligned per batch, so each batch occupies alignedlenlvl1 elements
+	constexpr uint buswidthlb = 9;
+	constexpr size_t tlweLen = TFHEpp::lvl1param::n + 1;
+	constexpr size_t alignedlenlvl1 = (((std::numeric_limits<TFHEpp::lvl1param::T>::digits*(TFHEpp::lvl1param::n+1)>>buswidthlb)+1)<<buswidthlb)/std::numeric_limits<TFHEpp::lvl1param::T>::digits;
+	constexpr size_t inputBufLen = numbatch * alignedlenlvl1;
+	constexpr size_t inputBufSize = inputBufLen * sizeof(TFHEpp::lvl1param::T);
+	// Output is element-width stream (Qbit), no bus alignment needed — packed at tlweLen stride
+	constexpr size_t outputBufLen = numbatch * tlweLen;
+	constexpr size_t outputBufSize = outputBufLen * sizeof(TFHEpp::lvl1param::T);
+	alignas(4096) std::array<TFHEpp::lvl1param::T, inputBufLen> combinedA = {}, combinedB = {};
+	alignas(4096) std::array<TFHEpp::lvl1param::T, outputBufLen> combinedRes = {};
+	for(uint b = 0; b < numbatch; b++) {
+		for(uint l = 0; l < tlweLen; l++) {
+			combinedA[b * alignedlenlvl1 + l] = tlwea[l];
+			combinedB[b * alignedlenlvl1 + l] = tlweb[l];
+		}
+	}
 
 
 	//aligned to distribute to module
-	constexpr uint buswidthlb = 9;
 	constexpr uint buswords = 1U<<(buswidthlb-6);
 	constexpr uint iksknumbus = 10;
 	constexpr uint wordsinbus = (1U<<buswidthlb)/std::numeric_limits<typename TFHEpp::lvl0param::T>::digits;
@@ -82,12 +102,13 @@ int main(int argc, char* argv[]) {
 	constexpr uint bknumbus = 8;
 	constexpr uint cyclebit = 5;
 	constexpr uint numcycle = 1<<cyclebit;
+	constexpr uint halfbase = 1U << (TFHEpp::lvl10param::basebit - 1);
 
-  	alignas(4096) std::array<std::array<std::array<std::array<std::array<std::array<typename TFHEpp::lvl0param::T, wordsinbus>, totaliksknumbus/iksknumbus>, (1 << TFHEpp::lvl10param::basebit) - 1>, TFHEpp::lvl10param::t>,TFHEpp::lvl1param::n>,iksknumbus> ikskaligned = {},ikskdebug = {};
-  	for(int i = 0; i<TFHEpp::lvl1param::n; i++) for(int j = 0; j < TFHEpp::lvl10param::t; j++) for(int k = 0; k< (1 << TFHEpp::lvl10param::basebit) - 1; k++) for(int l = 0; l < wordsinbus; l++) for(int m = 0; m < iksknumbus; m++) for(int n = 0; n < totaliksknumbus/iksknumbus; n++) ikskaligned[m][i][j][k][n][l] = (*iksk)[i][j][k][n*iksknumbus*wordsinbus+m*wordsinbus+l];
+  	alignas(4096) std::array<std::array<std::array<std::array<std::array<std::array<typename TFHEpp::lvl0param::T, wordsinbus>, totaliksknumbus/iksknumbus>, halfbase>, TFHEpp::lvl10param::t>,TFHEpp::lvl1param::n>,iksknumbus> ikskaligned = {};
+  	for(int i = 0; i<TFHEpp::lvl1param::n; i++) for(int j = 0; j < TFHEpp::lvl10param::t; j++) for(int k = 0; k < halfbase; k++) for(int l = 0; l < wordsinbus; l++) for(int m = 0; m < iksknumbus; m++) for(int n = 0; n < totaliksknumbus/iksknumbus; n++) { int idx = n*iksknumbus*wordsinbus+m*wordsinbus+l; if(idx <= TFHEpp::lvl0param::n) ikskaligned[m][i][j][k][n][l] = (*iksk)[i][j][k][idx]; }
 	for(int m = 0; m <iksknumbus; m++) std::cout<<"IKSK bus "<<m<<":"<<std::hex<<ikskaligned[m][0][0][0][0][0]<<std::endl;
 	std::cout <<"IKSK head :"<< std::hex << ikskaligned[0][0][0][0][0][0]<<std::endl;
-	std::cout << "IKSK tail :" << std::hex <<  ikskaligned[0][TFHEpp::lvl1param::n-1][TFHEpp::lvl10param::t-1][(1 << TFHEpp::lvl10param::basebit) - 2][totaliksknumbus/iksknumbus-1][0] <<std::endl;
+	std::cout << "IKSK tail :" << std::hex <<  ikskaligned[0][TFHEpp::lvl1param::n-1][TFHEpp::lvl10param::t-1][halfbase-1][totaliksknumbus/iksknumbus-1][0] <<std::endl;
 
 	alignas(4096) std::array<std::array<std::array<std::array<std::array<uint64_t,buswords>,numcycle>,2*TFHEpp::lvl1param::l>,TFHEpp::lvl0param::n>,bknumbus> bknttaligned = {};
 	for(int k =0; k < 2; k++) for(int bus = 0; bus < bknumbus/2; bus++) for(int i = 0; i < TFHEpp::lvl0param::n; i++) for(int l = 0; l < TFHEpp::lvl1param::l; l++) for(int kindex = 0; kindex <= TFHEpp::lvl1param::k; kindex++) for(int cycle = 0; cycle < numcycle; cycle++) for(int word = 0; word<buswords; word++) bknttaligned[k*bknumbus/2+bus][i][(TFHEpp::lvl1param::k+1)*l+kindex][cycle][word] = (*bkntt)[i][kindex*TFHEpp::lvl1param::l+l][k][cycle*bknumbus/2*buswords+bus*buswords+word].value;
@@ -100,9 +121,9 @@ int main(int argc, char* argv[]) {
 		// arg 3: output (res), arg 4: ina, arg 5: inb, args 6-15: iksk[0-9], args 16-23: bk[0-7]
 		constexpr int total_bufs = 1 + 2 + iksknumbus + bknumbus; // 21
 
-		int bo_res = fpga_alloc_buffer(3, sizeof(kernelres));
-		int bo_ina = fpga_alloc_buffer(4, sizeof(tlwea));
-		int bo_inb = fpga_alloc_buffer(5, sizeof(tlweb));
+		int bo_res = fpga_alloc_buffer(3, outputBufSize);
+		int bo_ina = fpga_alloc_buffer(4, inputBufSize);
+		int bo_inb = fpga_alloc_buffer(5, inputBufSize);
 
 		std::array<int, iksknumbus> bo_iksks;
 		for(int i = 0; i < iksknumbus; i++)
@@ -132,9 +153,9 @@ int main(int argc, char* argv[]) {
 		for(int i = 0; i < bknumbus; i++) bo_indices[3 + iksknumbus + i] = bo_bks[i];
 
 		for(int test = 0; test < 10; test++){
-			// Write input data and sync
-			fpga_write_buffer(bo_ina, tlwea.data(), sizeof(tlwea));
-			fpga_write_buffer(bo_inb, tlweb.data(), sizeof(tlweb));
+			// Write numbatch copies of input data and sync
+			fpga_write_buffer(bo_ina, combinedA.data(), inputBufSize);
+			fpga_write_buffer(bo_inb, combinedB.data(), inputBufSize);
 			fpga_sync_to_device(bo_ina);
 			fpga_sync_to_device(bo_inb);
 
@@ -154,14 +175,17 @@ int main(int argc, char* argv[]) {
 
 			// Read result from device
 			fpga_sync_from_device(bo_res);
-			fpga_read_buffer(bo_res, kernelres.data(), sizeof(kernelres));
+			fpga_read_buffer(bo_res, combinedRes.data(), outputBufSize);
 
 			kernel_time_in_sec = std::chrono::duration<double>(kernel_end - kernel_start).count();
 			std::cout<<"Gate "<<test<<" kernel time: "<<kernel_time_in_sec*1000.0<<" ms"<<std::endl;
 
-			for(int i = 0; i <= TFHEpp::lvl1param::n; i++){
-				if(kernelres[i] != res[i]){
-					std::cout<<"ERROR: "<<i<<" : "<<kernelres[i]<<" : "<<res[i]<<std::endl;
+			for(uint b = 0; b < numbatch; b++){
+				for(int i = 0; i <= TFHEpp::lvl1param::n; i++){
+					auto kernelval = combinedRes[b * tlweLen + i];
+					if(kernelval != res[i]){
+						std::cout<<"ERROR batch "<<b<<": "<<i<<" : "<<kernelval<<" : "<<res[i]<<std::endl;
+					}
 				}
 			}
 		}

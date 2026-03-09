@@ -1890,7 +1890,7 @@ GlobalOutslice globaloutsliceSLR1toSLR0(
   .io_manager_TDATA(gout_pre_TDATA)
 );
 
-// S2MMTlastCounter: generates TLAST for S2MM DRE flush (1025 beats per TLWE)
+// S2MMTlastCounter: generates TLAST for S2MM DRE flush (2050 beats = numbatch * (N+1))
 S2MMTlastCounter s2mmtlastcnt(
   .clock(ap_clk),
   .reset(areset),
