@@ -21,7 +21,7 @@ case class Config() {
     val mu = 1<<29
 
     // implementation specific parameters
-    val numbatch = 2
+    val numbatch = 3
 
     val buswidth = 512
     val hbmbuswidth = 512

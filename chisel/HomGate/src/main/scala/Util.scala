@@ -67,6 +67,28 @@ class RWSRmem(depth:Int, width:Int) extends Module {
     .otherwise    { io.out := rdwrPort }
 }
 
+// 3 Read + 1 Write port memory for BRmem (allows simultaneous PMBX reads and feedback writes)
+// Uses two SyncReadMem instances to work around Verilator issue with 3 read ports on single mem
+class BRMem(depth:Int, width:Int) extends Module {
+  val io = IO(new Bundle {
+    val wen = Input(Bool())
+    val waddr = Input(UInt(log2Ceil(depth).W))
+    val wdata = Input(UInt(width.W))
+    val raddr1 = Input(UInt(log2Ceil(depth).W))
+    val rdata1 = Output(UInt(width.W))
+    val raddr2 = Input(UInt(log2Ceil(depth).W))
+    val rdata2 = Output(UInt(width.W))
+    val raddr3 = Input(UInt(log2Ceil(depth).W))
+    val rdata3 = Output(UInt(width.W))
+  })
+
+  val mem = SyncReadMem(depth, UInt(width.W))
+  io.rdata1 := mem.read(io.raddr1)
+  io.rdata2 := mem.read(io.raddr2)
+  io.rdata3 := mem.read(io.raddr3)
+  when(io.wen) { mem.write(io.waddr, io.wdata) }
+}
+
 
 class BK2Formerslice(implicit val conf:Config) extends Module{
 	val io = IO(new Bundle{
