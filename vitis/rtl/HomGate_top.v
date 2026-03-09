@@ -714,16 +714,11 @@ wire axi4inbcmd_TVALID;
 wire axi4inbcmd_TREADY;
 wire [103:0] axi4inbcmd_TDATA;
 
-// GlobalOut (S2MM data) wires - after S2MMTlastCounter
+// GlobalOut (S2MM data) wires - TLAST from AXISBRFormer via GlobalOutslice
 wire axi4sout_TVALID;
 wire axi4sout_TREADY;
 wire [31:0] axi4sout_TDATA;
 wire axi4sout_TLAST;
-
-// GlobalOut pre-TLAST wires (between GlobalOutslice and S2MMTlastCounter)
-wire gout_pre_TVALID;
-wire gout_pre_TREADY;
-wire [31:0] gout_pre_TDATA;
 
 
 // S2MM DataMover status wires (for ILA)
@@ -1878,29 +1873,18 @@ BK2Formerslice globalinsliceSLR0toSLR1(
 assign axis00_tkeep = {64{1'b1}};
 assign axis00_tlast = 1'b0;
 
-// GlobalOutslice: axis01 (from BRFront) -> pre-TLAST wires
+// GlobalOutslice: axis01 (from BRFront, including TLAST) -> axi4sout_*
 GlobalOutslice globaloutsliceSLR1toSLR0(
   .clock(ap_clk),
   .reset(areset),
   .io_subordinate_TVALID(axis01_tvalid),
   .io_subordinate_TREADY(axis01_tready),
   .io_subordinate_TDATA(axis01_tdata),
-  .io_manager_TVALID(gout_pre_TVALID),
-  .io_manager_TREADY(gout_pre_TREADY),
-  .io_manager_TDATA(gout_pre_TDATA)
-);
-
-// S2MMTlastCounter: generates TLAST for S2MM DRE flush (2050 beats = numbatch * (N+1))
-S2MMTlastCounter s2mmtlastcnt(
-  .clock(ap_clk),
-  .reset(areset),
-  .io_subordinate_TVALID(gout_pre_TVALID),
-  .io_subordinate_TREADY(gout_pre_TREADY),
-  .io_subordinate_TDATA(gout_pre_TDATA),
+  .io_subordinate_TLAST(axis01_tlast),
   .io_manager_TVALID(axi4sout_TVALID),
   .io_manager_TREADY(axi4sout_TREADY),
   .io_manager_TDATA(axi4sout_TDATA),
-  .io_tlast(axi4sout_TLAST)
+  .io_manager_TLAST(axi4sout_TLAST)
 );
 
 endmodule

@@ -122,10 +122,10 @@ class GlobalInslice(implicit val conf:Config) extends Module{
 
 class GlobalOutslice(implicit val conf:Config) extends Module{
 	val io = IO(new Bundle{
-		val subordinate = new AXI4StreamSubordinate(conf.Qbit)
-		val manager = new AXI4StreamManager(conf.Qbit)
+		val subordinate = new AXI4StreamSubordinate(conf.Qbit, withTLast=true)
+		val manager = new AXI4StreamManager(conf.Qbit, withTLast=true)
 	})
-	val slice = Module(new AXI4StreamRegisterSlice(conf.Qbit,conf.axi4snumslice))
+	val slice = Module(new AXI4StreamRegisterSlice(conf.Qbit,conf.axi4snumslice,withTLast=true))
 	io.subordinate <> slice.io.subordinate
 	io.manager <> slice.io.manager
 }
@@ -146,33 +146,6 @@ class MultUint64Verilate(implicit val conf:Config) extends Module{
 	val temp = RegNext(((io.A(63,32) -& io.A(31,0)).asSInt) * ((io.B(63,32)-&io.B(31,0)).asSInt))
 	val z1 = (z2+&z0).zext -& temp
 	io.Y := RegNext((z2.zext<<64)+(z1<<32)+z0.zext).asUInt
-}
-
-class S2MMTlastCounter(implicit val conf:Config) extends Module{
-	val totalBeats = conf.numbatch * (conf.N + 1) // numbatch TLWE ciphertexts: each N+1 coefficients
-	val io = IO(new Bundle{
-		val subordinate = new AXI4StreamSubordinate(conf.Qbit)
-		val manager = new AXI4StreamManager(conf.Qbit)
-		val tlast = Output(Bool())
-	})
-	val counter = RegInit(0.U(log2Ceil(totalBeats).W))
-	val lastBeat = counter === (totalBeats - 1).U
-
-	// Pass through stream
-	io.manager.TVALID := io.subordinate.TVALID
-	io.subordinate.TREADY := io.manager.TREADY
-	io.manager.TDATA := io.subordinate.TDATA
-
-	// TLAST: assert on last beat when handshake fires
-	io.tlast := lastBeat
-
-	when(io.subordinate.TVALID && io.manager.TREADY){
-		when(lastBeat){
-			counter := 0.U
-		}.otherwise{
-			counter := counter + 1.U
-		}
-	}
 }
 
 //64-bit multiplier

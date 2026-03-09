@@ -34,7 +34,6 @@ import_files -norecurse [list \
     ${rtl_dir}/HomGateWrap.v \
     ${rtl_dir}/HomGate_top.v \
     ${rtl_dir}/HomGate_control_s_axi.v \
-    ${rtl_dir}/S2MMTlastCounter.v \
 ]
 
 set_property top HomGate [current_fileset]

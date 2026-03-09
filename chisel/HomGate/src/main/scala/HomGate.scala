@@ -202,7 +202,7 @@ class HomGateTop(implicit val conf:Config) extends Module{
 
 class HomGateWrap(implicit val conf:Config) extends Module{
 	val io = IO(new Bundle{
-		val axi4out = new AXI4StreamManager(conf.Qbit)
+		val axi4out = new AXI4StreamManager(conf.Qbit, withTLast=true)
 		val axi4ina = new AXI4StreamSubordinate(conf.buswidth)
 		val axi4inb = new AXI4StreamSubordinate(conf.buswidth)
 		val axi4ikskin = Vec(conf.iksknumbus,new AXI4StreamSubordinate(conf.hbmbuswidth))
@@ -317,5 +317,4 @@ class HomGateWrap(implicit val conf:Config) extends Module{
 object HomGateWrapTop extends App {
   implicit val conf = Config()
   (new chisel3.stage.ChiselStage).emitVerilog(new HomGateWrap)
-  (new chisel3.stage.ChiselStage).emitVerilog(new S2MMTlastCounter)
 }

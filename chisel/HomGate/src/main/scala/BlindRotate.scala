@@ -27,7 +27,7 @@ class BlindRotate(implicit val conf:Config) extends Module{
 		val avalue = Input(UInt(conf.qbit.W))
 		val batchidx = Output(UInt(log2Ceil(conf.numbatch).W))
 		val dimidx = Output(UInt(log2Ceil(conf.n).W))
-		val axi4sglobalout = new AXI4StreamManager(conf.Qbit)
+		val axi4sglobalout = new AXI4StreamManager(conf.Qbit, withTLast=true)
 		val axi4sin = Vec(conf.trlwenumbus,new AXI4StreamSubordinate(conf.buswidth))
 		val axi4sout = Vec(conf.trlwenumbus,new AXI4StreamManager(conf.buswidth))
 		val enable = Input(Bool())
@@ -125,7 +125,18 @@ class BlindRotate(implicit val conf:Config) extends Module{
 	BRmem.io.raddr1 := 0.U
 	sei.io.in := BRmem.io.rdata1
 	sei.io.enable := false.B
-	sei.io.axi4sout <> io.axi4sglobalout
+	// Connect SEI output to global out, adding TLAST counter
+	io.axi4sglobalout.TVALID := sei.io.axi4sout.TVALID
+	io.axi4sglobalout.TDATA  := sei.io.axi4sout.TDATA
+	sei.io.axi4sout.TREADY   := io.axi4sglobalout.TREADY
+	val totalBeats = conf.numbatch * (conf.N + 1)
+	val outCounter = RegInit(0.U(log2Ceil(totalBeats).W))
+	val outLastBeat = outCounter === (totalBeats - 1).U
+	io.axi4sglobalout.TLAST.get := outLastBeat
+	when(io.axi4sglobalout.TVALID && io.axi4sglobalout.TREADY) {
+		when(outLastBeat) { outCounter := 0.U }
+		.otherwise        { outCounter := outCounter + 1.U }
+	}
 
 	val gapWaitCnt = RegInit(0.U(log2Ceil(conf.numcycle * (conf.k + 1)).W))
 	val statereg = RegInit(BlindRotateState.WAIT)
@@ -241,7 +252,7 @@ class BlindRotate(implicit val conf:Config) extends Module{
 class AXISBRFormer(implicit val conf:Config) extends Module{
 	val io = IO(new Bundle{
 		val axi4sglobalin = new AXI4StreamSubordinate(conf.buswidth)
-		val axi4sglobalout = new AXI4StreamManager(conf.Qbit)
+		val axi4sglobalout = new AXI4StreamManager(conf.Qbit, withTLast=true)
 		val axi4sin = Vec(conf.trlwenumbus,new AXI4StreamSubordinate(conf.buswidth))
 		val axi4sout = Vec(conf.nttnumbus,new AXI4StreamManager(conf.buswidth))
 
@@ -251,7 +262,7 @@ class AXISBRFormer(implicit val conf:Config) extends Module{
 
 	val tlwe2index = Module(new TLWE2Index(conf.buswidth,conf.n,conf.qbit))
 	val inslice = Module(new AXI4StreamRegisterSlice(conf.buswidth,conf.axi4snumslice))
-	val outslice = Module(new AXI4StreamRegisterSlice(conf.buswidth,conf.axi4snumslice))
+	val outslice = Module(new AXI4StreamRegisterSlice(conf.buswidth,conf.axi4snumslice,withTLast=true))
 	val br = Module(new BlindRotate)
 	val extpformer = Module(new ExternalProductFormer)
 	val extppremiddle = Module(new ExternalProductPreMiddle)

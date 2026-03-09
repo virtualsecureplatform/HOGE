@@ -108,6 +108,7 @@ module BRFront #(
     .io_axi4sglobalout_TVALID  (axis01_tvalid),
     .io_axi4sglobalout_TREADY  (axis01_tready),
     .io_axi4sglobalout_TDATA   (axis01_tdata),
+    .io_axi4sglobalout_TLAST   (axis01_tlast),
     // 2 inputs from AXISBRLater (only channel 0 has TVALID)
     .io_axi4sin_0_TVALID       (axis06_tvalid),
     .io_axi4sin_0_TDATA        (axis06_tdata),
@@ -123,9 +124,8 @@ module BRFront #(
   // --------------------------------------------------------------------------
   // TKEEP / TLAST for MASTER ports
   // --------------------------------------------------------------------------
-  // axis01: 32-bit master
+  // axis01: 32-bit master (TLAST driven by AXISBRFormer beat counter)
   assign axis01_tkeep = 4'hF;
-  assign axis01_tlast = 1'b0;
 
   // axis02-05: 512-bit masters
   assign axis02_tkeep = {64{1'b1}};

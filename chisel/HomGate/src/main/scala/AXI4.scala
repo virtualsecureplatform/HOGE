@@ -40,34 +40,42 @@ class AXI4Manager(val buswidth: Int) extends Bundle{
 	val read = new AXI4ManagerRead(buswidth)
 }
 
-class AXI4StreamManager(val buswidth: Int) extends Bundle{
+class AXI4StreamManager(val buswidth: Int, val withTLast: Boolean = false) extends Bundle{
 	val TVALID = Output(Bool())
 	val TREADY = Input(Bool())
 	val TDATA = Output(UInt(buswidth.W))
+	val TLAST = if (withTLast) Some(Output(Bool())) else None
 }
 
-class AXI4StreamSubordinate(val buswidth: Int) extends Bundle{
+class AXI4StreamSubordinate(val buswidth: Int, val withTLast: Boolean = false) extends Bundle{
 	val TVALID = Input(Bool())
 	val TREADY = Output(Bool())
 	val TDATA = Input(UInt(buswidth.W))
+	val TLAST = if (withTLast) Some(Input(Bool())) else None
 }
 
-class AXI4StreamRegisterSlice(val buswidth: Int, val numslice: Int) extends Module{
+class AXI4StreamRegisterSlice(val buswidth: Int, val numslice: Int, val withTLast: Boolean = false) extends Module{
+	val internalWidth = if (withTLast) buswidth + 1 else buswidth
 	val io = IO(new Bundle{
-		val subordinate = new AXI4StreamSubordinate(buswidth)
-		val manager = new AXI4StreamManager(buswidth)
+		val subordinate = new AXI4StreamSubordinate(buswidth, withTLast)
+		val manager = new AXI4StreamManager(buswidth, withTLast)
 	})
 	val slices = for(i <- 0 until numslice) yield{
-        val slice = Module(new Queue(UInt(buswidth.W),2,useSyncReadMem = true))
+        val slice = Module(new Queue(UInt(internalWidth.W),2,useSyncReadMem = true))
         slice
 	}
-	slices(0).io.enq.bits := io.subordinate.TDATA
+	val inData = if (withTLast) Cat(io.subordinate.TLAST.get, io.subordinate.TDATA) else io.subordinate.TDATA
+	slices(0).io.enq.bits := inData
 	slices(0).io.enq.valid := io.subordinate.TVALID
 	io.subordinate.TREADY := slices(0).io.enq.ready
 	for(i <- 1 until numslice){
 		slices(i).io.enq <> slices(i-1).io.deq
 	}
-	io.manager.TDATA := slices(numslice-1).io.deq.bits
+	val outData = slices(numslice-1).io.deq.bits
+	io.manager.TDATA := outData(buswidth-1, 0)
 	io.manager.TVALID := slices(numslice-1).io.deq.valid
 	slices(numslice-1).io.deq.ready := io.manager.TREADY
+	if (withTLast) {
+		io.manager.TLAST.get := outData(buswidth)
+	}
 }
