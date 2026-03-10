@@ -18,7 +18,7 @@ class RotatedTestVector(implicit val conf:Config) extends Module{
 }
 
 object BlindRotateState extends ChiselEnum {
-  val WAIT,INIT,BUBBLE,PMBXMOWAIT,PMBXGAP,RUN,OUT = Value
+  val WAIT,INIT,BUBBLE,PMBXMOWAIT,PMBXGAP,OUT = Value
 }
 
 class BlindRotate(implicit val conf:Config) extends Module{
@@ -183,46 +183,48 @@ class BlindRotate(implicit val conf:Config) extends Module{
 				pmbxmoenablewire := false.B
 				when(batchreg =/= (conf.numbatch-1).U){
 					batchreg := batchreg + 1.U
-					statereg := BlindRotateState.PMBXGAP
 				}.otherwise{
-					statereg := BlindRotateState.RUN
+					batchreg := 0.U
 				}
+				statereg := BlindRotateState.PMBXGAP
 			}
 			io.debugout := Cat(pmbxmo.io.out.reverse)
 			io.debugvalid := pmbxmo.io.valid
 		}
 		is(BlindRotateState.PMBXGAP){
 			io.debugvalid := false.B
-			amemBatchIdx := batchreg
-			amemDimIdx := brcntreg
-			when(io.decreadyin){
+			// At dimension boundary (batchreg wrapped to 0): pre-read next dim's a value
+			when(batchreg === 0.U){
+				amemBatchIdx := 0.U
+				amemDimIdx := brcntreg + 1.U
+			}.otherwise{
+				amemBatchIdx := batchreg
+				amemDimIdx := brcntreg
+			}
+
+			val atDimBoundary = batchreg === 0.U
+			val feedbackReady = !atDimBoundary || finreg === conf.numbatch.U
+
+			when(io.decreadyin && feedbackReady){
 				when(gapWaitCnt === (conf.pmbxgap - 1).U){
 					gapWaitCnt := 0.U
-					pmbxmoenablewire := true.B
-					statereg := BlindRotateState.PMBXMOWAIT
+					when(atDimBoundary){
+						finreg := 0.U
+						io.extpfin := true.B
+						feedbackbatch := 0.U
+						when(brcntreg =/= (conf.n-1).U){
+							brcntreg := brcntreg + 1.U
+							pmbxmoenablewire := true.B
+							statereg := BlindRotateState.PMBXMOWAIT
+						}.otherwise{
+							statereg := BlindRotateState.OUT
+						}
+					}.otherwise{
+						pmbxmoenablewire := true.B
+						statereg := BlindRotateState.PMBXMOWAIT
+					}
 				}.otherwise{
 					gapWaitCnt := gapWaitCnt + 1.U
-				}
-			}
-		}
-		is(BlindRotateState.RUN){
-			io.debugvalid := false.B
-			amemBatchIdx := 0.U
-			amemDimIdx := brcntreg + 1.U
-			when(finreg === conf.numbatch.U){
-				finreg := 0.U
-				io.extpfin := true.B
-				feedbackbatch := 0.U
-				when(RegNext(brcntreg =/= (conf.n-1).U)){
-					batchreg := 0.U
-					brcntreg := brcntreg + 1.U
-					pmbxmoenablewire := true.B
-					amemBatchIdx := 0.U
-					amemDimIdx := brcntreg + 1.U
-					statereg := BlindRotateState.PMBXMOWAIT
-				}.otherwise{
-					batchreg := 0.U
-					statereg := BlindRotateState.OUT
 				}
 			}
 		}

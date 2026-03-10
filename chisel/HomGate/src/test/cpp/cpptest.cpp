@@ -6,7 +6,7 @@
 #include <tfhe++.hpp>
 
   //allgned to distribute to module
-  constexpr uint numbatch = 2;
+  constexpr uint numbatch = 3;
   constexpr uint iksknumbus = 10;
   constexpr uint hbmbuswidthlb = 9;
   constexpr uint hbmbuswords = 1U<<(hbmbuswidthlb-5);
