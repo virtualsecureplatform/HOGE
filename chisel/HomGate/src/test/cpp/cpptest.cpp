@@ -6,7 +6,7 @@
 #include <tfhe++.hpp>
 
   //allgned to distribute to module
-  constexpr uint numbatch = 3;
+  constexpr uint numbatch = 2;
   constexpr uint iksknumbus = 10;
   constexpr uint hbmbuswidthlb = 9;
   constexpr uint hbmbuswords = 1U<<(hbmbuswidthlb-5);
@@ -28,8 +28,10 @@
 alignas(4096) std::array<std::array<std::array<std::array<std::array<uint64_t,nttwordsinbus>,numcycle>,(TFHEpp::lvl1param::k+1)*TFHEpp::lvl1param::l>,TFHEpp::lvl0param::n>,bknumbus> bknttaligned = {};
 std::array<uint,bknumbus> buscycle = {};
 
+uint global_cycle = 0;
 void clock(VHomGateWrap *dut, VerilatedFstC* tfp = nullptr){
   static uint time_counter = 0;
+  global_cycle++;
   const std::array<uint8_t,bknumbus> treadyarray = {dut->io_axi4bkin_0_TREADY,dut->io_axi4bkin_1_TREADY,dut->io_axi4bkin_2_TREADY,dut->io_axi4bkin_3_TREADY,dut->io_axi4bkin_4_TREADY,dut->io_axi4bkin_5_TREADY,dut->io_axi4bkin_6_TREADY,dut->io_axi4bkin_7_TREADY};
   const std::array<uint8_t*,bknumbus> tvalidarray = {&(dut->io_axi4bkin_0_TVALID),&(dut->io_axi4bkin_1_TVALID),&(dut->io_axi4bkin_2_TVALID),&(dut->io_axi4bkin_3_TVALID),&(dut->io_axi4bkin_4_TVALID),&(dut->io_axi4bkin_5_TVALID),&(dut->io_axi4bkin_6_TVALID),&(dut->io_axi4bkin_7_TVALID)};
   std::array<uint32_t*,bknumbus> bkbusarray = {dut->io_axi4bkin_0_TDATA,dut->io_axi4bkin_1_TDATA,dut->io_axi4bkin_2_TDATA,dut->io_axi4bkin_3_TDATA,dut->io_axi4bkin_4_TDATA,dut->io_axi4bkin_5_TDATA,dut->io_axi4bkin_6_TDATA,dut->io_axi4bkin_7_TDATA};
@@ -319,6 +321,7 @@ int main(int argc, char** argv) {
 
   clock(dut, tfp);
 
+  uint br_start_cycle = global_cycle;
   std::cout<<"BR"<<std::endl;
 
   // Per-batch BR state - use hardware IKS output as reference input
@@ -393,6 +396,8 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
   // Correctness verified by PMBX check at next dimension + final SEI output.
   std::cout<<i<<std::endl;
 }
+  uint br_end_cycle = global_cycle;
+  std::cout<<"BR cycles: "<<(br_end_cycle - br_start_cycle)<<" (numbatch="<<numbatch<<")"<<std::endl;
   dut->io_ap_start = 0;
 
   // Capture output for each batch
