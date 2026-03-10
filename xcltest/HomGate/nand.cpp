@@ -20,7 +20,7 @@ extern "C" {
 }
 
 int main(int argc, char* argv[]) {
-	constexpr uint numbatch = 3;
+	constexpr uint numbatch = 2;
 	constexpr uint16_t scaleaindex = 2;
 	constexpr uint16_t scalebindex = 2;
 	constexpr uint16_t offsetindex = 0;
