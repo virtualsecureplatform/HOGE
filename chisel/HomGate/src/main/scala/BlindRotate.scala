@@ -196,7 +196,7 @@ class BlindRotate(implicit val conf:Config) extends Module{
 			amemBatchIdx := batchreg
 			amemDimIdx := brcntreg
 			when(io.decreadyin){
-				when(gapWaitCnt === (conf.numcycle * (conf.k + 1) - 2).U){
+				when(gapWaitCnt === (conf.pmbxgap - 1).U){
 					gapWaitCnt := 0.U
 					pmbxmoenablewire := true.B
 					statereg := BlindRotateState.PMBXMOWAIT

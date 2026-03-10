@@ -21,7 +21,7 @@ case class Config() {
     val mu = 1<<29
 
     // implementation specific parameters
-    val numbatch = 3
+    val numbatch = 2
 
     val buswidth = 512
     val hbmbuswidth = 512
@@ -52,6 +52,11 @@ case class Config() {
     val muldelay = multiplierpipestage + 2
     val lshdelay = 3
     val radixdelay = 5
+
+    // Inter-batch gap for pipelined PMBX (auto-calculated from pipeline parameters)
+    // SwitchTransposeUnit(radixbit,radixbit) needs ~halfcycle cycles to reach WAIT boundary
+    // Gap at Decomp output = pmbxgap + PMBX_startup(~4), must >= halfcycle-1 = 2^(radixbit-1)-1
+    val pmbxgap = muldelay + interslr/2
 
 
     //Constants
