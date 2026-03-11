@@ -329,13 +329,14 @@ module BRBack #(
     .io_subordinate_TVALID (axis17_tvalid),
     .io_subordinate_TREADY (axis17_tready),
     .io_subordinate_TDATA  (axis17_tdata),
+    .io_subordinate_TLAST  (axis17_tlast),
     .io_manager_TVALID     (axis16_tvalid),
     .io_manager_TREADY     (axis16_tready),
-    .io_manager_TDATA      (axis16_tdata)
+    .io_manager_TDATA      (axis16_tdata),
+    .io_manager_TLAST      (axis16_tlast)
   );
 
   assign axis16_tkeep = {4{1'b1}};
-  assign axis16_tlast = 1'b0;
 
 // axis18: tied off (unused)
 assign axis18_tvalid = 1'b0;

@@ -80,6 +80,7 @@ class HomGateTop(implicit val conf:Config) extends Module{
 		val bkaddr = Input(Vec(conf.bknumbus,UInt(64.W)))
 
 		val brvalid = Input(Bool())
+		val brvalid_tlast = Input(Bool())
 
 		val user_rst = Output(Bool())
 
@@ -123,8 +124,6 @@ class HomGateTop(implicit val conf:Config) extends Module{
 	val bkincmdreg = RegInit(VecInit(Seq.fill(conf.bknumbus)(0.U(1.W))))
 
 	val countreg = RegInit(0.U(3.W))
-	// Count brvalid falling edges to detect all numbatch batches received from BRBack
-	val batchdonereg = RegInit(0.U(log2Ceil(conf.numbatch).W))
 
 	switch(statereg){
 		is(HomGateState.WAIT){
@@ -140,7 +139,6 @@ class HomGateTop(implicit val conf:Config) extends Module{
 			outcmdreg := false.B
 			inacmdreg := false.B
 			inbcmdreg := false.B
-			batchdonereg := 0.U
 			for(i <- 0 until conf.iksknumbus){
 				ikskincmdreg(i) := false.B
 			}
@@ -187,14 +185,10 @@ class HomGateTop(implicit val conf:Config) extends Module{
 		}
 		is(HomGateState.RUN){
 			io.ap_idle := false.B
-			when(~io.brvalid && RegNext(io.brvalid)){
-				// Brvalid falling edge = one batch's results received from BRBack
-				when(batchdonereg === (conf.numbatch - 1).U){
-					io.ap_done := true.B
-					statereg := HomGateState.WAIT
-				}.otherwise{
-					batchdonereg := batchdonereg + 1.U
-				}
+			// TLAST on output stream = all numbatch batches fully output
+			when(io.brvalid && io.brvalid_tlast){
+				io.ap_done := true.B
+				statereg := HomGateState.WAIT
 			}
 		}
 	}
@@ -277,6 +271,7 @@ class HomGateWrap(implicit val conf:Config) extends Module{
 	homnand.io.ikskaddr := io.ikskaddr
 	homnand.io.bkaddr := io.bkaddr
 	homnand.io.brvalid := globaloutsliceSLR1toSLR0.io.manager.TVALID
+	homnand.io.brvalid_tlast := globaloutsliceSLR1toSLR0.io.manager.TLAST.get
 
 	tlweadd.io.scaleaindex := io.scaleaindex
 	tlweadd.io.scalebindex := io.scalebindex

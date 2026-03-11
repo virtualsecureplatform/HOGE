@@ -1666,6 +1666,7 @@ HomGateTop homgate(
   .clock(ap_clk),
   .reset(areset),
   .io_brvalid(axi4sout_TVALID),
+  .io_brvalid_tlast(axi4sout_TLAST),
   .io_axi4outcmd_TVALID(axi4outcmd_TVALID),
   .io_axi4outcmd_TREADY(axi4outcmd_TREADY),
   .io_axi4outcmd_TDATA(axi4outcmd_TDATA),
