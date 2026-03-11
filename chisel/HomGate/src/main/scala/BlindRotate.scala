@@ -95,10 +95,12 @@ class BlindRotate(implicit val conf:Config) extends Module{
 		tdatavec(i) :=  ShiftRegister(io.axi4sin(i).TDATA,conf.interslr/2)
 	}
 	// Total feedback completion counter (counts all feedback across all dimensions)
+	// Count burst completions (initcnt wrapping at 2*numcycle-1) rather than TVALID falling edges,
+	// because pmbxgap < 2*numcycle means consecutive dispatches' feedback bursts overlap (no gap).
 	val finreg = RegInit(0.U(log2Ceil(conf.n * conf.numbatch + 1).W))
-    when(RegNext(~ShiftRegister(io.axi4sin(0).TVALID,conf.interslr/2)&&ShiftRegister(io.axi4sin(0).TVALID,conf.interslr/2+1))){
-        finreg := finreg +1.U
-    }
+	when(ShiftRegister(io.axi4sin(0).TVALID, conf.interslr/2) && initcnt === (2*conf.numcycle-1).U){
+		finreg := finreg + 1.U
+	}
 	val addedres = Wire(Vec(conf.chunk,Vec(conf.radix,UInt(conf.Qbit.W))))
 	for(i <- 0 until conf.chunk){
 		for(j <- 0 until conf.radix){
