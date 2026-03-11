@@ -95,7 +95,7 @@ class BK2Formerslice(implicit val conf:Config) extends Module{
 		val subordinate = new AXI4StreamSubordinate(conf.buswidth)
 		val manager = new AXI4StreamManager(conf.buswidth)
 	})
-	val slice = Module(new AXI4StreamRegisterSlice(conf.buswidth,conf.axi4snumslice))
+	val slice = Module(new AXI4StreamRegisterSlice(conf.buswidth,conf.bk2numslice))
 	io.subordinate <> slice.io.subordinate
 	io.manager <> slice.io.manager
 }

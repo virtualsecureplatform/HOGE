@@ -33,6 +33,7 @@ case class Config() {
     val totaliksknumbus = iksknumsegments * iksknumbus
 
     val axi4snumslice = 8
+    val bk2numslice = 4
     val accnumslice = 8
     val interslr = 8
 
