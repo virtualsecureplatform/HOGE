@@ -673,7 +673,10 @@ inst_control_s_axi (
   .axi17_ptr0   ( axi17_ptr0            ),
   .axi18_ptr0   ( axi18_ptr0            ),
   .axi19_ptr0   ( axi19_ptr0            ),
-  .axi20_ptr0   ( axi20_ptr0            )
+  .axi20_ptr0   ( axi20_ptr0            ),
+  .dbg_reg0     ( dbg_iksout_cnt        ),
+  .dbg_reg1     ( dbg_axis01_cnt        ),
+  .dbg_reg2     ( dbg_misc              )
 );
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -724,6 +727,42 @@ wire axi4sout_TLAST;
 // S2MM DataMover status wires (for ILA)
 wire dm00_s2mm_err;
 wire dm00_s2mm_sts_tvalid;
+
+// Debug beat counters (read via AXI-lite at 0x200/0x204/0x208)
+reg [31:0] dbg_iksout_cnt  = 32'b0;  // AXISIKS output beats accepted
+reg [31:0] dbg_axis01_cnt  = 32'b0;  // axis01 beats entering HomGate
+reg [31:0] dbg_misc        = 32'b0;  // latched/live status bits
+
+always @(posedge ap_clk) begin
+    if (areset) begin
+        dbg_iksout_cnt <= 32'b0;
+        dbg_axis01_cnt <= 32'b0;
+        dbg_misc       <= 32'b0;
+    end else begin
+        // Count AXISIKS output accepted beats (expect 40 total for 2 batches)
+        if (axi4siksout_TVALID && axi4siksout_TREADY && dbg_iksout_cnt != 32'hFFFFFFFF)
+            dbg_iksout_cnt <= dbg_iksout_cnt + 1;
+        // Count axis01 input beats from BRBack (expect 2050 per gate)
+        if (axis01_tvalid && axis01_tready && dbg_axis01_cnt != 32'hFFFFFFFF)
+            dbg_axis01_cnt <= dbg_axis01_cnt + 1;
+        // Latch misc status bits (sticky once set)
+        if (axi4sout_TLAST)              dbg_misc[0] <= 1'b1;  // axi4sout TLAST seen
+        if (dm00_s2mm_err)               dbg_misc[1] <= 1'b1;  // S2MM error
+        if (axi4outcmd_TVALID)           dbg_misc[2] <= 1'b1;  // S2MM command issued
+        if (dm00_s2mm_sts_tvalid)        dbg_misc[3] <= 1'b1;  // S2MM completed
+        if (axi4siksout_TVALID)          dbg_misc[4] <= 1'b1;  // IKS ever had output valid
+        if (axis01_tvalid)               dbg_misc[5] <= 1'b1;  // axis01 ever had data
+        // Live (instantaneous) signals in bits 15:8
+        dbg_misc[8]  <= axi4siksout_TVALID;
+        dbg_misc[9]  <= axi4siksout_TREADY;
+        dbg_misc[10] <= axis01_tvalid;
+        dbg_misc[11] <= axis01_tready;
+        dbg_misc[12] <= axi4sout_TVALID;
+        dbg_misc[13] <= axi4sout_TLAST;
+        dbg_misc[14] <= axi4outcmd_TVALID;
+        dbg_misc[15] <= axi4outcmd_TREADY;
+    end
+end
 
 axi_datamover_0 datamover00 (
   .m_axi_s2mm_aclk(ap_clk),

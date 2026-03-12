@@ -54,7 +54,11 @@ module HomGate_control_s_axi #(
     output wire [63:0]                     axi17_ptr0,
     output wire [63:0]                     axi18_ptr0,
     output wire [63:0]                     axi19_ptr0,
-    output wire [63:0]                     axi20_ptr0
+    output wire [63:0]                     axi20_ptr0,
+    // Debug read-only registers
+    input  wire [31:0]                     dbg_reg0,
+    input  wire [31:0]                     dbg_reg1,
+    input  wire [31:0]                     dbg_reg2
 );
 
     //------------------------Address Info-------------------
@@ -141,6 +145,9 @@ module HomGate_control_s_axi #(
         ADDR_AXI19_PTR0_DATA_1   = 12'h110,
         ADDR_AXI20_PTR0_DATA_0   = 12'h118,
         ADDR_AXI20_PTR0_DATA_1   = 12'h11c,
+        ADDR_DBG_REG0            = 12'h200,  // AXISIKS output beat count
+        ADDR_DBG_REG1            = 12'h204,  // axis01 input beat count (SEI→HomGate)
+        ADDR_DBG_REG2            = 12'h208,  // misc status bits
         WRIDLE                   = 2'd0,
         WRDATA                   = 2'd1,
         WRRESP                   = 2'd2,
@@ -353,6 +360,9 @@ module HomGate_control_s_axi #(
                     ADDR_AXI19_PTR0_DATA_1: rdata <= int_axi19_ptr0[63:32];
                     ADDR_AXI20_PTR0_DATA_0: rdata <= int_axi20_ptr0[31:0];
                     ADDR_AXI20_PTR0_DATA_1: rdata <= int_axi20_ptr0[63:32];
+                    ADDR_DBG_REG0: rdata <= dbg_reg0;
+                    ADDR_DBG_REG1: rdata <= dbg_reg1;
+                    ADDR_DBG_REG2: rdata <= dbg_reg2;
                     default: rdata <= 32'b0;
                 endcase
             end

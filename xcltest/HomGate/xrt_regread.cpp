@@ -8,6 +8,8 @@
 #include <exception>
 #include <vector>
 #include <cstring>
+#include <chrono>
+#include <thread>
 
 static xrt::device* s_dev = nullptr;
 static xrt::kernel* s_kern = nullptr;
@@ -138,7 +140,42 @@ int fpga_start_kernel(uint16_t scalea, uint16_t scaleb, uint16_t offset,
 
 int fpga_wait_kernel(int run_idx) {
     try {
-        s_runs[run_idx]->wait();
+        auto t0 = std::chrono::steady_clock::now();
+        const int poll_interval_ms = 5000;
+        const int timeout_s = 120;
+        while (true) {
+            auto st = s_runs[run_idx]->wait(std::chrono::milliseconds(poll_interval_ms));
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::steady_clock::now() - t0).count();
+            // ert_cmd_state: 4=completed, 6=timeout, others=error/busy
+            if (st == ERT_CMD_STATE_COMPLETED) {
+                if (elapsed >= poll_interval_ms / 1000)
+                    std::cout << "fpga_wait_kernel: done after " << elapsed << "s" << std::endl;
+                break;
+            }
+            // Print AP control register and debug register diagnostics
+            uint32_t ap_ctrl = 0xDEAD, dbg0 = 0xDEAD, dbg1 = 0xDEAD, dbg2 = 0xDEAD;
+            if (s_kern) {
+                try { ap_ctrl = s_kern->read_register(0x000); } catch (...) {}
+                try { dbg0   = s_kern->read_register(0x200); } catch (...) {}
+                try { dbg1   = s_kern->read_register(0x204); } catch (...) {}
+                try { dbg2   = s_kern->read_register(0x208); } catch (...) {}
+            }
+            std::cout << "fpga_wait_kernel: " << elapsed << "s elapsed, ap_ctrl=0x"
+                      << std::hex << ap_ctrl << std::dec
+                      << " (ap_start=" << ((ap_ctrl>>0)&1)
+                      << " ap_done="  << ((ap_ctrl>>1)&1)
+                      << " ap_idle="  << ((ap_ctrl>>2)&1)
+                      << " ap_ready=" << ((ap_ctrl>>3)&1) << ")"
+                      << " iksout_beats=" << dbg0
+                      << " axis01_beats=" << dbg1
+                      << " misc=0x" << std::hex << dbg2 << std::dec
+                      << std::endl;
+            if (elapsed >= timeout_s) {
+                std::cerr << "fpga_wait_kernel: TIMEOUT after " << elapsed << "s" << std::endl;
+                return -1;
+            }
+        }
         delete s_runs[run_idx];
         s_runs[run_idx] = nullptr;
         return 0;
