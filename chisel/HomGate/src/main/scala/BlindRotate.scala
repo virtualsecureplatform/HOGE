@@ -369,14 +369,22 @@ class AXISBRLater(implicit val conf:Config) extends Module{
 	for(k <- 0 until conf.k+1){
 		val tvalidvec = Wire(Vec(conf.bknumbus/2,Bool()))
 		val tdatavec = Wire(Vec(conf.bknumbus/2,UInt(conf.buswidth.W)))
-		for(i <- 0 until conf.bknumbus/2){
+		val allValid = Cat(tvalidvec).andR
+		val slices = for(i <- 0 until conf.bknumbus/2) yield {
 			val slice = Module(new AXI4StreamRegisterSlice(conf.buswidth,conf.axi4snumslice))
 			slice.io.subordinate <> io.axi4bkin(k*conf.bknumbus/2+i)
-			slice.io.manager.TREADY := extpmiddle.io.trgswinready(k)
 			tvalidvec(i) := slice.io.manager.TVALID
 			tdatavec(i) := slice.io.manager.TDATA
+			slice
 		}
-		extpmiddle.io.trgswinvalid(k) := Cat(tvalidvec).andR
+		// Slices must advance atomically: only when ALL 4 buses are simultaneously valid
+		// AND TRGSWBatchMemory is ready to accept. Without this, a momentary stall on any
+		// one HBM bus causes the other 3 slices to consume their data without writing it to
+		// TRGSWBatchMemory (silently discarding those BK beats → corrupted accumulation).
+		for(i <- 0 until conf.bknumbus/2){
+			slices(i).io.manager.TREADY := extpmiddle.io.trgswinready(k) && allValid
+		}
+		extpmiddle.io.trgswinvalid(k) := allValid
 		extpmiddle.io.trgswin(k) := Cat(tdatavec.reverse)
 	}
 

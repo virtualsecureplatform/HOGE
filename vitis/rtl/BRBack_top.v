@@ -338,9 +338,35 @@ module BRBack #(
 
   assign axis16_tkeep = {4{1'b1}};
 
-// axis18: tied off (unused)
-assign axis18_tvalid = 1'b0;
-assign axis18_tdata  = 32'b0;
+// axis18: debug counters packed into 32 bits (→ HomGate axis10 → bkin0_beats register)
+// Each byte = bits[16:9] of a 17-bit beat counter (512 beats/unit):
+// [31:24] = axis04_tvalid >>9 (feedback ch0, max 81408→0x9F; 3 short→0x9E)
+// [23:16] = axis05_tvalid >>9 (feedback ch1, same expected value)
+// [15: 8] = axis06_tvalid >>9 (BK ch0 from HomGate, max 122112→0xEE; stalled→less)
+// [ 7: 0] = axis10_tvalid >>9 (BK ch4 from HomGate, same expected value as ch0)
+reg [16:0] dbg_fb0_cnt  = 17'b0;
+reg [16:0] dbg_fb1_cnt  = 17'b0;
+reg [16:0] dbg_bk0_cnt  = 17'b0;
+reg [16:0] dbg_bk4_cnt  = 17'b0;
+always @(posedge ap_clk) begin
+    if (areset) begin
+        dbg_fb0_cnt <= 17'b0;
+        dbg_fb1_cnt <= 17'b0;
+        dbg_bk0_cnt <= 17'b0;
+        dbg_bk4_cnt <= 17'b0;
+    end else begin
+        if (axis04_tvalid && dbg_fb0_cnt != 17'h1FFFF)
+            dbg_fb0_cnt <= dbg_fb0_cnt + 1;
+        if (axis05_tvalid && dbg_fb1_cnt != 17'h1FFFF)
+            dbg_fb1_cnt <= dbg_fb1_cnt + 1;
+        if (axis06_tvalid && dbg_bk0_cnt != 17'h1FFFF)
+            dbg_bk0_cnt <= dbg_bk0_cnt + 1;
+        if (axis10_tvalid && dbg_bk4_cnt != 17'h1FFFF)
+            dbg_bk4_cnt <= dbg_bk4_cnt + 1;
+    end
+end
+assign axis18_tvalid = 1'b1;
+assign axis18_tdata  = {dbg_fb0_cnt[16:9], dbg_fb1_cnt[16:9], dbg_bk0_cnt[16:9], dbg_bk4_cnt[16:9]};
 assign axis18_tkeep  = {4{1'b1}};
 assign axis18_tlast  = 1'b0;
 

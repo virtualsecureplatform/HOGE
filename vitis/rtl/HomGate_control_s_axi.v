@@ -58,7 +58,8 @@ module HomGate_control_s_axi #(
     // Debug read-only registers
     input  wire [31:0]                     dbg_reg0,
     input  wire [31:0]                     dbg_reg1,
-    input  wire [31:0]                     dbg_reg2
+    input  wire [31:0]                     dbg_reg2,
+    input  wire [31:0]                     dbg_reg3
 );
 
     //------------------------Address Info-------------------
@@ -148,6 +149,7 @@ module HomGate_control_s_axi #(
         ADDR_DBG_REG0            = 12'h200,  // AXISIKS output beat count
         ADDR_DBG_REG1            = 12'h204,  // axis01 input beat count (SEI→HomGate)
         ADDR_DBG_REG2            = 12'h208,  // misc status bits
+        ADDR_DBG_REG3            = 12'h20c,  // BK bus0 (axis02) beat count
         WRIDLE                   = 2'd0,
         WRDATA                   = 2'd1,
         WRRESP                   = 2'd2,
@@ -363,6 +365,7 @@ module HomGate_control_s_axi #(
                     ADDR_DBG_REG0: rdata <= dbg_reg0;
                     ADDR_DBG_REG1: rdata <= dbg_reg1;
                     ADDR_DBG_REG2: rdata <= dbg_reg2;
+                    ADDR_DBG_REG3: rdata <= dbg_reg3;
                     default: rdata <= 32'b0;
                 endcase
             end

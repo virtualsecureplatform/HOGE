@@ -154,12 +154,13 @@ int fpga_wait_kernel(int run_idx) {
                 break;
             }
             // Print AP control register and debug register diagnostics
-            uint32_t ap_ctrl = 0xDEAD, dbg0 = 0xDEAD, dbg1 = 0xDEAD, dbg2 = 0xDEAD;
+            uint32_t ap_ctrl = 0xDEAD, dbg0 = 0xDEAD, dbg1 = 0xDEAD, dbg2 = 0xDEAD, dbg3 = 0xDEAD;
             if (s_kern) {
                 try { ap_ctrl = s_kern->read_register(0x000); } catch (...) {}
                 try { dbg0   = s_kern->read_register(0x200); } catch (...) {}
                 try { dbg1   = s_kern->read_register(0x204); } catch (...) {}
                 try { dbg2   = s_kern->read_register(0x208); } catch (...) {}
+                try { dbg3   = s_kern->read_register(0x20c); } catch (...) {}
             }
             std::cout << "fpga_wait_kernel: " << elapsed << "s elapsed, ap_ctrl=0x"
                       << std::hex << ap_ctrl << std::dec
@@ -170,6 +171,12 @@ int fpga_wait_kernel(int run_idx) {
                       << " iksout_beats=" << dbg0
                       << " axis01_beats=" << dbg1
                       << " misc=0x" << std::hex << dbg2 << std::dec
+                      << " brback_dbg=0x" << std::hex << dbg3
+                      << "(fb0=" << ((dbg3>>24)&0xFF) << "/0x9F"
+                      << " fb1=" << ((dbg3>>16)&0xFF) << "/0x9F"
+                      << " bk0=" << ((dbg3>>8)&0xFF) << "/0xEE"
+                      << " bk4=" << ((dbg3>>0)&0xFF) << "/0xEE)"
+                      << std::dec
                       << std::endl;
             if (elapsed >= timeout_s) {
                 std::cerr << "fpga_wait_kernel: TIMEOUT after " << elapsed << "s" << std::endl;

@@ -40,6 +40,12 @@ for {set i 0} {$i <= 18} {incr i} {
     ipx::associate_bus_interfaces -busif [format "axis%02d" $i] -clock ap_clk [ipx::current_core]
 }
 
+# Workaround: ipx::package_project -import_files sometimes fails to copy RTL files.
+# Manually copy sources to ip_repo/src so package_xo includes them.
+file mkdir ${ip_repo_dir}/src
+file copy -force ${rtl_dir}/BRBack_top.v ${ip_repo_dir}/src/BRBack_top.v
+file copy -force ${rtl_dir}/HomGateWrap.v ${ip_repo_dir}/src/HomGateWrap.v
+
 # Save IP
 ipx::create_xgui_files [ipx::current_core]
 ipx::update_checksums [ipx::current_core]

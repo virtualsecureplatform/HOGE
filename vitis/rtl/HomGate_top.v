@@ -676,7 +676,8 @@ inst_control_s_axi (
   .axi20_ptr0   ( axi20_ptr0            ),
   .dbg_reg0     ( dbg_iksout_cnt        ),
   .dbg_reg1     ( dbg_axis01_cnt        ),
-  .dbg_reg2     ( dbg_misc              )
+  .dbg_reg2     ( dbg_misc              ),
+  .dbg_reg3     ( dbg_bkin0_cnt         )
 );
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -728,16 +729,18 @@ wire axi4sout_TLAST;
 wire dm00_s2mm_err;
 wire dm00_s2mm_sts_tvalid;
 
-// Debug beat counters (read via AXI-lite at 0x200/0x204/0x208)
+// Debug beat counters (read via AXI-lite at 0x200/0x204/0x208/0x20c)
 reg [31:0] dbg_iksout_cnt  = 32'b0;  // AXISIKS output beats accepted
 reg [31:0] dbg_axis01_cnt  = 32'b0;  // axis01 beats entering HomGate
 reg [31:0] dbg_misc        = 32'b0;  // latched/live status bits
+reg [31:0] dbg_bkin0_cnt   = 32'b0;  // NTT beat count from BRBack (via axis18→axis10)
 
 always @(posedge ap_clk) begin
     if (areset) begin
         dbg_iksout_cnt <= 32'b0;
         dbg_axis01_cnt <= 32'b0;
         dbg_misc       <= 32'b0;
+        dbg_bkin0_cnt  <= 32'b0;
     end else begin
         // Count AXISIKS output accepted beats (expect 40 total for 2 batches)
         if (axi4siksout_TVALID && axi4siksout_TREADY && dbg_iksout_cnt != 32'hFFFFFFFF)
@@ -745,6 +748,9 @@ always @(posedge ap_clk) begin
         // Count axis01 input beats from BRBack (expect 2050 per gate)
         if (axis01_tvalid && axis01_tready && dbg_axis01_cnt != 32'hFFFFFFFF)
             dbg_axis01_cnt <= dbg_axis01_cnt + 1;
+        // Capture BRBack NTT-beat counter from axis10 (debug stream)
+        if (axis10_tvalid)
+            dbg_bkin0_cnt <= axis10_tdata;
         // Latch misc status bits (sticky once set)
         if (axi4sout_TLAST)              dbg_misc[0] <= 1'b1;  // axi4sout TLAST seen
         if (dm00_s2mm_err)               dbg_misc[1] <= 1'b1;  // S2MM error
@@ -752,6 +758,7 @@ always @(posedge ap_clk) begin
         if (dm00_s2mm_sts_tvalid)        dbg_misc[3] <= 1'b1;  // S2MM completed
         if (axi4siksout_TVALID)          dbg_misc[4] <= 1'b1;  // IKS ever had output valid
         if (axis01_tvalid)               dbg_misc[5] <= 1'b1;  // axis01 ever had data
+        if (axi4bkin_0_TVALID)           dbg_misc[6] <= 1'b1;  // BK bus0 ever had data
         // Live (instantaneous) signals in bits 15:8
         dbg_misc[8]  <= axi4siksout_TVALID;
         dbg_misc[9]  <= axi4siksout_TREADY;
