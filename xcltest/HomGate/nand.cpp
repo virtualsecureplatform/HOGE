@@ -1,4 +1,7 @@
 #include <tfhe++.hpp>
+#include <climits>
+#include <cstdlib>
+#include <cstring>
 #include <unistd.h>
 #include <chrono>
 #include <iostream>
@@ -25,8 +28,17 @@ int main(int argc, char* argv[]) {
 	constexpr uint16_t scalebindex = 2;
 	constexpr uint16_t offsetindex = 0;
 
-	if (argc != 2) {
-        printf("Usage: %s <XCLBIN> \n", argv[0]);
+	int stressIterations = 2;
+	if (argc == 4 && std::strcmp(argv[2], "--iterations") == 0) {
+		char* end = nullptr;
+		const long parsed = std::strtol(argv[3], &end, 10);
+		if (*argv[3] == '\0' || *end != '\0' || parsed <= 0 || parsed > INT_MAX) {
+			std::cerr << "invalid --iterations value: " << argv[3] << std::endl;
+			return 2;
+		}
+		stressIterations = static_cast<int>(parsed);
+	} else if (argc != 2) {
+		printf("Usage: %s <XCLBIN> [--iterations N]\n", argv[0]);
         return -1;
     }
     std::string binaryFile = argv[1];
@@ -152,14 +164,15 @@ int main(int argc, char* argv[]) {
 		for(int i = 0; i < iksknumbus; i++) bo_indices[3 + i] = bo_iksks[i];
 		for(int i = 0; i < bknumbus; i++) bo_indices[3 + iksknumbus + i] = bo_bks[i];
 
-		for(int test = 0; test < 2; test++){
+		size_t mismatchCount = 0;
+		for(int test = 0; test < stressIterations; test++){
 			// Write numbatch copies of input data and sync
 			fpga_write_buffer(bo_ina, combinedA.data(), inputBufSize);
 			fpga_write_buffer(bo_inb, combinedB.data(), inputBufSize);
 			fpga_sync_to_device(bo_ina);
 			fpga_sync_to_device(bo_inb);
 
-			std::cout<<"START gate "<<test<<std::endl;
+			std::cout<<"START gate "<<std::dec<<test<<std::endl;
 			std::cout.flush();
 
 			auto kernel_start = std::chrono::high_resolution_clock::now();
@@ -169,7 +182,11 @@ int main(int argc, char* argv[]) {
 			                                bo_indices, total_bufs);
 
 			// Wait for kernel completion
-			fpga_wait_kernel(run_idx);
+			if (run_idx < 0 || fpga_wait_kernel(run_idx) != 0) {
+				std::cerr << "Gate " << test << " failed to complete" << std::endl;
+				fpga_cleanup();
+				return 1;
+			}
 			auto kernel_end = std::chrono::high_resolution_clock::now();
 			std::cout<<"END gate "<<test<<std::endl;
 
@@ -180,14 +197,24 @@ int main(int argc, char* argv[]) {
 			kernel_time_in_sec = std::chrono::duration<double>(kernel_end - kernel_start).count();
 			std::cout<<"Gate "<<test<<" kernel time: "<<kernel_time_in_sec*1000.0<<" ms"<<std::endl;
 
+			size_t iterationErrors = 0;
 			for(uint b = 0; b < numbatch; b++){
 				for(int i = 0; i <= TFHEpp::lvl1param::n; i++){
 					auto kernelval = combinedRes[b * tlweLen + i];
 					if(kernelval != res[i]){
 						std::cout<<"ERROR batch "<<b<<": "<<i<<" : "<<kernelval<<" : "<<res[i]<<std::endl;
+						iterationErrors++;
 					}
 				}
 			}
+			mismatchCount += iterationErrors;
+			std::cout << "Gate " << test << (iterationErrors == 0 ? " PASS" : " FAIL")
+			          << " (mismatches=" << iterationErrors << ")" << std::endl;
+		}
+		if (mismatchCount != 0) {
+			std::cerr << "FAIL: " << mismatchCount << " total output mismatches" << std::endl;
+			fpga_cleanup();
+			return 1;
 		}
 	}
 	std::cout<<"PASS"<<std::endl;

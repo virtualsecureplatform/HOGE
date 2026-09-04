@@ -1,4 +1,6 @@
 #include <bits/stdint-uintn.h>
+#include <climits>
+#include <cstdlib>
 #include <cstring>
 #include <verilated.h>
 #include <verilated_fst_c.h>
@@ -59,6 +61,26 @@ void clock(VHomGateWrap *dut, VerilatedFstC* tfp = nullptr){
 }
 
 int main(int argc, char** argv) {
+  int stressIterations = 2;
+  bool outputStalls = false;
+  for (int arg = 1; arg < argc; arg++) {
+    if (std::strcmp(argv[arg], "--iterations") == 0) {
+      if (++arg == argc) {
+        std::cerr << "--iterations requires a positive integer" << std::endl;
+        return 2;
+      }
+      char* end = nullptr;
+      const long parsed = std::strtol(argv[arg], &end, 10);
+      if (*argv[arg] == '\0' || *end != '\0' || parsed <= 0 || parsed > INT_MAX) {
+        std::cerr << "invalid --iterations value: " << argv[arg] << std::endl;
+        return 2;
+      }
+      stressIterations = static_cast<int>(parsed);
+    } else if (std::strcmp(argv[arg], "--output-stalls") == 0) {
+      outputStalls = true;
+    }
+  }
+
   //generatros
   std::random_device seed_gen;
   std::default_random_engine engine(seed_gen());
@@ -171,7 +193,9 @@ int main(int argc, char** argv) {
   dut->io_axi4bkincmd_6_TREADY = 1;
   dut->io_axi4bkincmd_7_TREADY = 1;
 
-  for(int test = 0; test < 2; test++){
+  for(int test = 0; test < stressIterations; test++){
+
+  std::cout<<"Iteration "<<test<<"/"<<(stressIterations-1)<<std::endl;
 
   std::cout<<"Initialize"<<std::endl;
   dut->io_ap_start = 1;
@@ -424,6 +448,16 @@ for (int i = 0; i < TFHEpp::lvl0param::n; i++) {
   std::array<TFHEpp::lvl1param::T, numbatch * outputElements> resout = {};
   for(uint batch = 0; batch < numbatch; batch++){
     for(uint i = 0; i < outputElements; i++){
+      if (outputStalls) {
+        // Fill the output slices and propagate back-pressure to SampleExtract.
+        // Each word must remain stable until TREADY is reasserted.
+        dut->io_axi4out_TREADY = 0;
+        dut->eval();
+        while(dut->io_axi4out_TVALID==0) clock(dut, tfp);
+        clock(dut, tfp);
+        dut->io_axi4out_TREADY = 1;
+        dut->eval();
+      }
       while(dut->io_axi4out_TVALID==0) clock(dut, tfp);
       resout[batch * outputElements + i] = dut->io_axi4out_TDATA;
       clock(dut, tfp);

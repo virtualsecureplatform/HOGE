@@ -771,6 +771,22 @@ always @(posedge ap_clk) begin
     end
 end
 
+// The queued inter-kernel TLAST can arrive one cycle after its associated
+// TVALID.  Generate TLAST from accepted transfers at the actual DMA boundary.
+reg [11:0] axi4sout_output_word_cnt = 12'd0;
+always @(posedge ap_clk) begin
+    if (areset || !user_rst_n)
+        axi4sout_output_word_cnt <= 12'd0;
+    else if (axi4sout_TVALID && axi4sout_TREADY) begin
+        if (axi4sout_output_word_cnt == 12'd2049)
+            axi4sout_output_word_cnt <= 12'd0;
+        else
+            axi4sout_output_word_cnt <= axi4sout_output_word_cnt + 1'b1;
+    end
+end
+wire axi4sout_counted_tlast = axi4sout_TVALID &&
+                              (axi4sout_output_word_cnt == 12'd2049);
+
 axi_datamover_0 datamover00 (
   .m_axi_s2mm_aclk(ap_clk),
   .m_axi_s2mm_aresetn(ap_rst_n&user_rst_n),
@@ -805,7 +821,7 @@ axi_datamover_0 datamover00 (
   .m_axi_s2mm_bready(m00_axi_bready),
   .s_axis_s2mm_tdata(axi4sout_TDATA),
   .s_axis_s2mm_tkeep(4'hF),
-  .s_axis_s2mm_tlast(axi4sout_TLAST),
+  .s_axis_s2mm_tlast(axi4sout_counted_tlast),
   .s_axis_s2mm_tvalid(axi4sout_TVALID),
   .s_axis_s2mm_tready(axi4sout_TREADY)
 );
@@ -1712,7 +1728,7 @@ HomGateTop homgate(
   .clock(ap_clk),
   .reset(areset),
   .io_brvalid(axi4sout_TVALID),
-  .io_brvalid_tlast(axi4sout_TLAST),
+  .io_brready(axi4sout_TREADY),
   .io_axi4outcmd_TVALID(axi4outcmd_TVALID),
   .io_axi4outcmd_TREADY(axi4outcmd_TREADY),
   .io_axi4outcmd_TDATA(axi4outcmd_TDATA),

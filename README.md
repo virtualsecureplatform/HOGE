@@ -101,6 +101,21 @@ For RTL-level simulation without Vitis (tests Chisel logic only, no DataMovers):
 docker-test.bash
 ```
 
+The Verilator test runs two HomGate iterations by default. To stress repeated
+execution past a specific boundary, pass the desired count to the generated
+test binary:
+
+```bash
+ulimit -s unlimited
+build/chisel/HomGate/src/test/cpp/cpptest --iterations 20
+```
+
+Add `--output-stalls` to exercise output back-pressure on every result word:
+
+```bash
+build/chisel/HomGate/src/test/cpp/cpptest --iterations 2 --output-stalls
+```
+
 ## Performance
 
 - Kernel time: ~1.55 ms/gate at 292 MHz on Alveo U280

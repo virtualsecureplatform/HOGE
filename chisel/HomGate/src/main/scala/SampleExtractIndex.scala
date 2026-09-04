@@ -18,10 +18,13 @@ class SampleExtractIndex(index : Int, implicit val conf:Config) extends Module{
 
 	val statereg = RegInit(SampleExtractIndexState.WAIT)
 	val cntreg = RegInit(0.U(conf.Nbit.W))
+	val stalled = RegInit(false.B)
+	val stalledData = Reg(UInt(conf.Qbit.W))
 	
 	io.addr := index.U
 	io.axi4sout.TVALID := false.B
-	io.axi4sout.TDATA := DontCare
+	val outputData = WireDefault(0.U(conf.Qbit.W))
+	io.axi4sout.TDATA := Mux(stalled, stalledData, outputData)
 	val wordwire = Wire(Vec(conf.block,UInt(conf.Qbit.W)))
 	for(i <- 0 until conf.block){
 		wordwire(i) := io.in((i+1)*conf.Qbit-1,i*conf.Qbit)
@@ -31,6 +34,13 @@ class SampleExtractIndex(index : Int, implicit val conf:Config) extends Module{
 	val seibeats = RegInit(0.U(16.W))
 	when(io.axi4sout.TVALID && io.axi4sout.TREADY){
 		seibeats := seibeats + 1.U
+		stalled := false.B
+	}.elsewhen(io.axi4sout.TVALID && !stalled){
+		// BRmem is synchronous and continues returning the prefetched address
+		// while the output is stalled. Preserve the currently presented word
+		// until its AXI-stream handshake completes.
+		stalledData := outputData
+		stalled := true.B
 	}
 	val seistallcnt = RegInit(0.U(32.W))
 	when(io.axi4sout.TVALID && !io.axi4sout.TREADY){
@@ -53,7 +63,7 @@ class SampleExtractIndex(index : Int, implicit val conf:Config) extends Module{
 		is(SampleExtractIndexState.POSITIVE){
 			val inindex = (index.U - cntreg)(conf.Nbit-1,conf.Nbit-conf.radixbit)
 			io.addr := (index.U - cntreg - 1.U)(conf.radixbit-1,0)
-			io.axi4sout.TDATA := wordwire(inindex)
+			outputData := wordwire(inindex)
 			io.axi4sout.TVALID := true.B
 			when(io.axi4sout.TREADY){
 				cntreg := cntreg + 1.U
@@ -66,7 +76,7 @@ class SampleExtractIndex(index : Int, implicit val conf:Config) extends Module{
 		is(SampleExtractIndexState.NEGATIVE){
 			val inindex = ((conf.N+index).U - cntreg)(conf.Nbit-1,conf.Nbit-conf.radixbit)
 			io.addr := ((conf.N+index).U - cntreg - 1.U)(conf.radixbit-1,0)
-			io.axi4sout.TDATA := - wordwire(inindex)
+			outputData := - wordwire(inindex)
 			io.axi4sout.TVALID := true.B
 			when(io.axi4sout.TREADY){
 				when(cntreg === (conf.N-1).U){
@@ -78,7 +88,7 @@ class SampleExtractIndex(index : Int, implicit val conf:Config) extends Module{
 			}
 		}
 		is(SampleExtractIndexState.B){
-			io.axi4sout.TDATA := io.in((index+1)*conf.Qbit-1,index*conf.Qbit)
+			outputData := io.in((index+1)*conf.Qbit-1,index*conf.Qbit)
 			io.axi4sout.TVALID := true.B
 			when(io.axi4sout.TREADY){
 				statereg := SampleExtractIndexState.FIN
@@ -90,5 +100,6 @@ class SampleExtractIndex(index : Int, implicit val conf:Config) extends Module{
 	when(~io.enable){
 		statereg := SampleExtractIndexState.WAIT
 		cntreg := 0.U
+		stalled := false.B
 	}
 }

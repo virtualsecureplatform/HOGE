@@ -80,7 +80,7 @@ class HomGateTop(implicit val conf:Config) extends Module{
 		val bkaddr = Input(Vec(conf.bknumbus,UInt(64.W)))
 
 		val brvalid = Input(Bool())
-		val brvalid_tlast = Input(Bool())
+		val brready = Input(Bool())
 
 		val user_rst = Output(Bool())
 
@@ -124,6 +124,7 @@ class HomGateTop(implicit val conf:Config) extends Module{
 	val bkincmdreg = RegInit(VecInit(Seq.fill(conf.bknumbus)(0.U(1.W))))
 
 	val countreg = RegInit(0.U(3.W))
+	val outputBeatCount = RegInit(0.U(log2Ceil(conf.numbatch * (conf.N + 1)).W))
 
 	switch(statereg){
 		is(HomGateState.WAIT){
@@ -145,6 +146,7 @@ class HomGateTop(implicit val conf:Config) extends Module{
 			for(i <- 0 until conf.bknumbus){
 				bkincmdreg(i) := false.B
 			}
+			outputBeatCount := 0.U
 			when(countreg=/=7.U){
 				countreg := countreg + 1.U
 			}.otherwise{
@@ -185,10 +187,16 @@ class HomGateTop(implicit val conf:Config) extends Module{
 		}
 		is(HomGateState.RUN){
 			io.ap_idle := false.B
-			// TLAST on output stream = all numbatch batches fully output
-			when(io.brvalid && io.brvalid_tlast){
-				io.ap_done := true.B
-				statereg := HomGateState.WAIT
+			// Completion is based on accepted output beats.  Some inter-kernel
+			// register slices do not keep TLAST aligned with TVALID under stalls.
+			when(io.brvalid && io.brready){
+				when(outputBeatCount === (conf.numbatch * (conf.N + 1) - 1).U){
+					outputBeatCount := 0.U
+					io.ap_done := true.B
+					statereg := HomGateState.WAIT
+				}.otherwise{
+					outputBeatCount := outputBeatCount + 1.U
+				}
 			}
 		}
 	}
@@ -271,7 +279,7 @@ class HomGateWrap(implicit val conf:Config) extends Module{
 	homnand.io.ikskaddr := io.ikskaddr
 	homnand.io.bkaddr := io.bkaddr
 	homnand.io.brvalid := globaloutsliceSLR1toSLR0.io.manager.TVALID
-	homnand.io.brvalid_tlast := globaloutsliceSLR1toSLR0.io.manager.TLAST.get
+	homnand.io.brready := globaloutsliceSLR1toSLR0.io.manager.TREADY
 
 	tlweadd.io.scaleaindex := io.scaleaindex
 	tlweadd.io.scalebindex := io.scalebindex

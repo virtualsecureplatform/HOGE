@@ -153,6 +153,8 @@ if [ ! -f "${XCLBIN_FILE}" ]; then
         --vivado.synth.jobs 8 \
         --vivado.impl.jobs 8 \
         --vivado.prop "run.impl_1.{strategy}={Congestion_SpreadLogic_high}" \
+        --vivado.prop "run.impl_1.STEPS.POST_ROUTE_PHYS_OPT_DESIGN.IS_ENABLED={true}" \
+        --vivado.prop "run.impl_1.STEPS.POST_ROUTE_PHYS_OPT_DESIGN.ARGS.DIRECTIVE={AggressiveExplore}" \
         -o "${XCLBIN_FILE}" \
         "${XO_DIR}/HomGate.xo" \
         "${XO_DIR}/BRBack.xo" \
