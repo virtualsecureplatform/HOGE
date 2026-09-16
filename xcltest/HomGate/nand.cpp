@@ -22,6 +22,16 @@ extern "C" {
   void fpga_cleanup();
 }
 
+// Buffer failures must stop verification rather than compare stale output.
+static int checked_buffer_result(int result) {
+    if (result < 0) {
+        std::cerr << "FPGA buffer operation failed" << std::endl;
+        fpga_cleanup();
+        std::exit(EXIT_FAILURE);
+    }
+    return result;
+}
+
 int main(int argc, char* argv[]) {
 	constexpr uint numbatch = 2;
 	constexpr uint16_t scaleaindex = 2;
@@ -38,18 +48,22 @@ int main(int argc, char* argv[]) {
 		}
 		stressIterations = static_cast<int>(parsed);
 	} else if (argc != 2) {
-		printf("Usage: %s <XCLBIN> [--iterations N]\n", argv[0]);
+#ifdef HOGE_AWS_F2
+        printf("Usage: %s slot:N [--iterations N]\n", argv[0]);
+#else
+        printf("Usage: %s <XCLBIN> [--iterations N]\n", argv[0]);
+#endif
         return -1;
     }
     std::string binaryFile = argv[1];
 
-    // Initialize FPGA via XRT native API
+    // Initialize the FPGA through the selected runtime backend.
     if (fpga_init(binaryFile.c_str()) != 0) {
         std::cout << "Failed to initialize FPGA, exit!" << std::endl;
         return -1;
     }
 
-    std::cout << "FPGA programmed." << std::endl;
+    std::cout << "FPGA initialized." << std::endl;
 
     //generators
     std::random_device seed_gen;
@@ -133,26 +147,26 @@ int main(int argc, char* argv[]) {
 		// arg 3: output (res), arg 4: ina, arg 5: inb, args 6-15: iksk[0-9], args 16-23: bk[0-7]
 		constexpr int total_bufs = 1 + 2 + iksknumbus + bknumbus; // 21
 
-		int bo_res = fpga_alloc_buffer(3, outputBufSize);
-		int bo_ina = fpga_alloc_buffer(4, inputBufSize);
-		int bo_inb = fpga_alloc_buffer(5, inputBufSize);
+		int bo_res = checked_buffer_result(fpga_alloc_buffer(3, outputBufSize));
+		int bo_ina = checked_buffer_result(fpga_alloc_buffer(4, inputBufSize));
+		int bo_inb = checked_buffer_result(fpga_alloc_buffer(5, inputBufSize));
 
 		std::array<int, iksknumbus> bo_iksks;
 		for(int i = 0; i < iksknumbus; i++)
-			bo_iksks[i] = fpga_alloc_buffer(6 + i, sizeof(ikskaligned[i]));
+			bo_iksks[i] = checked_buffer_result(fpga_alloc_buffer(6 + i, sizeof(ikskaligned[i])));
 
 		std::array<int, bknumbus> bo_bks;
 		for(int i = 0; i < bknumbus; i++)
-			bo_bks[i] = fpga_alloc_buffer(16 + i, sizeof(bknttaligned[i]));
+			bo_bks[i] = checked_buffer_result(fpga_alloc_buffer(16 + i, sizeof(bknttaligned[i])));
 
 		// Write key data to buffers and sync to device
 		for(int i = 0; i < iksknumbus; i++) {
-			fpga_write_buffer(bo_iksks[i], ikskaligned[i].data(), sizeof(ikskaligned[i]));
-			fpga_sync_to_device(bo_iksks[i]);
+			checked_buffer_result(fpga_write_buffer(bo_iksks[i], ikskaligned[i].data(), sizeof(ikskaligned[i])));
+			checked_buffer_result(fpga_sync_to_device(bo_iksks[i]));
 		}
 		for(int i = 0; i < bknumbus; i++) {
-			fpga_write_buffer(bo_bks[i], bknttaligned[i].data(), sizeof(bknttaligned[i]));
-			fpga_sync_to_device(bo_bks[i]);
+			checked_buffer_result(fpga_write_buffer(bo_bks[i], bknttaligned[i].data(), sizeof(bknttaligned[i])));
+			checked_buffer_result(fpga_sync_to_device(bo_bks[i]));
 		}
 		std::cout<<"Copy"<<std::endl;
 
@@ -167,10 +181,10 @@ int main(int argc, char* argv[]) {
 		size_t mismatchCount = 0;
 		for(int test = 0; test < stressIterations; test++){
 			// Write numbatch copies of input data and sync
-			fpga_write_buffer(bo_ina, combinedA.data(), inputBufSize);
-			fpga_write_buffer(bo_inb, combinedB.data(), inputBufSize);
-			fpga_sync_to_device(bo_ina);
-			fpga_sync_to_device(bo_inb);
+			checked_buffer_result(fpga_write_buffer(bo_ina, combinedA.data(), inputBufSize));
+			checked_buffer_result(fpga_write_buffer(bo_inb, combinedB.data(), inputBufSize));
+			checked_buffer_result(fpga_sync_to_device(bo_ina));
+			checked_buffer_result(fpga_sync_to_device(bo_inb));
 
 			std::cout<<"START gate "<<std::dec<<test<<std::endl;
 			std::cout.flush();
@@ -191,8 +205,8 @@ int main(int argc, char* argv[]) {
 			std::cout<<"END gate "<<test<<std::endl;
 
 			// Read result from device
-			fpga_sync_from_device(bo_res);
-			fpga_read_buffer(bo_res, combinedRes.data(), outputBufSize);
+			checked_buffer_result(fpga_sync_from_device(bo_res));
+			checked_buffer_result(fpga_read_buffer(bo_res, combinedRes.data(), outputBufSize));
 
 			kernel_time_in_sec = std::chrono::duration<double>(kernel_end - kernel_start).count();
 			std::cout<<"Gate "<<test<<" kernel time: "<<kernel_time_in_sec*1000.0<<" ms"<<std::endl;

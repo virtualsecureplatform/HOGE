@@ -33,6 +33,13 @@ The design uses 3 kernels mapped to different SLRs on the Alveo U280:
 | BRBack   | SLR1 | NTT pipelines, MulAndAcc |
 | BRFront  | SLR2 | BlindRotate, INTT, ExternalProduct |
 
+## AWS F2 (experimental)
+
+An independent HDK Small Shell target is available under [`aws/`](aws/README.md).
+It shares the computation and NAND reference test with U280, while using a
+separate hardware build and AWS SDK host backend. The U280 commands below remain
+unchanged. See the F2 README for build instructions and validation limitations.
+
 ## Building
 
 ### Hardware Emulation (hw_emu)
